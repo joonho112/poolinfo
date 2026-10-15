@@ -1,0 +1,409 @@
+# poolinfo
+
+A multisite trial, a meta-analysis or a small area estimation problem
+gives an estimate and a standard error for each site. A hierarchical
+model shrinks each estimate toward the overall mean, and the weight that
+a site’s posterior mean keeps on its own estimate is the site’s
+reliability. poolinfo summarizes the reliabilities of all the sites at
+once: their informativeness (the reliability at the geometric mean of
+the sampling variances), their mean, their dispersion, and a count of
+how the total reliability is shared among the sites. It computes the
+posterior distribution of each from the estimates and their standard
+errors, and it plots them. The summaries are worth checking before you
+rank sites, report site effects or study how an effect varies across
+sites, because they measure how much of each site’s own estimate
+survives the pooling. The diagnostics are those of Lee (2026).
+
+## Installation
+
+You can install poolinfo from GitHub with:
+
+``` r
+
+# install.packages("remotes")
+remotes::install_github("joonho112/poolinfo", build_vignettes = TRUE)
+```
+
+The vignettes are also on the [package
+website](https://joonho112.github.io/poolinfo/).
+
+## Example
+
+The data set `ocrs` has the estimated effects of an online credit
+recovery course on course passing in the 32 school-by-subject sites of
+the Online Credit Recovery Study ([Rickles et al.,
+2024](https://doi.org/10.1080/19345747.2023.2198524)), with their
+standard errors.
+[`reliability_posterior()`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+computes the posterior distribution of the diagnostics by numerical
+integration over the between-site standard deviation, with a flat prior
+on it and on the mean.
+
+``` r
+
+library(poolinfo)
+fit <- reliability_posterior(estimate, se = se, site = site, data = ocrs,
+                             scale_label = "risk difference")
+fit
+#> Reliability profile of 32 sites (posterior)
+#> Model: estimate ~ N(effect, se^2), effect ~ N(mean, sigma_tau^2),
+#>        sites independent
+#> Prior: flat on the mean and on sigma_tau
+#> Scale of the effects: risk difference
+#> Summaries are conditional on the supplied standard errors.
+#> Each site counts equally in the diagnostics, whatever its size.
+#> 
+#>                              mean     95% interval
+#>   informativeness I          0.671    0.497    0.812
+#>   mean reliability           0.663    0.498    0.801
+#>   dispersion H               0.0253   0.0185   0.0289
+#>   concentration count J_eff  31.2     30.3     31.7     of 32
+#>   logit variance V           0.237    (fixed by the standard errors)
+#>   sigma_tau                  0.188    0.127    0.266
+#>   effect mean                -0.130   -0.211   -0.0498
+#> 
+#>   Pr(I > 0.5)                0.973
+#>   I at E(sigma_tau^2)        0.691
+```
+
+The informativeness is 0.67, with a 95% posterior interval from 0.50 to
+0.81, so a site whose sampling variance is the geometric mean of the 32
+keeps about 67% of its own estimate in its posterior mean. The mean
+reliability, 0.66, is close to it, the dispersion is H = 0.025, and the
+concentration count is 31.2 of 32, so the total reliability is shared
+almost evenly among the sites. Every summary is conditional on the
+standard errors, which the model treats as known.
+
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) shows the site
+estimates and their posterior means, the sorted reliabilities, the
+posterior density of the informativeness and the plane of the
+informativeness and the logit variance.
+
+``` r
+
+plot(fit, scale = 100)
+```
+
+![Four panels: the site estimates and their posterior means with
+intervals; the sorted site reliabilities with the informativeness and
+its band; the posterior density of the informativeness; and the
+informativeness and logit variance
+plane.](reference/figures/README-dashboard-1.png)
+
+## What else is in the package
+
+- Diagnostics of a profile at a fixed between-site standard deviation:
+  [`reliability_profile()`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md),
+  [`kl_centroid()`](https://joonho112.github.io/poolinfo/reference/kl_centroid.md),
+  [`kl_dispersion()`](https://joonho112.github.io/poolinfo/reference/kl_dispersion.md),
+  [`concentration_count()`](https://joonho112.github.io/poolinfo/reference/concentration_count.md)
+  and related functions.
+- Diagnostics from fits of other packages:
+  [`reliability_draws()`](https://joonho112.github.io/poolinfo/reference/reliability_draws.md)
+  for posterior draws (from brms, for example), and methods for metafor,
+  ebnm and multisiteDGP objects;
+  [`map_tau2_interval()`](https://joonho112.github.io/poolinfo/reference/map_tau2_interval.md)
+  maps a confidence interval for the between-site variance.
+- Planning:
+  [`reliability_design()`](https://joonho112.github.io/poolinfo/reference/reliability_design.md),
+  [`balanced_allocation()`](https://joonho112.github.io/poolinfo/reference/balanced_allocation.md)
+  and
+  [`solve_design()`](https://joonho112.github.io/poolinfo/reference/solve_design.md)
+  give the profile of a planned trial and allocations of a total or a
+  budget to the sites.
+- Comparing and reporting:
+  [`compare_profiles()`](https://joonho112.github.io/poolinfo/reference/compare_profiles.md),
+  [`prior_sensitivity()`](https://joonho112.github.io/poolinfo/reference/prior_sensitivity.md),
+  [`report_table()`](https://joonho112.github.io/poolinfo/reference/report_table.md)
+  and
+  [`report_text()`](https://joonho112.github.io/poolinfo/reference/report_text.md).
+
+[`vignette("poolinfo")`](https://joonho112.github.io/poolinfo/articles/poolinfo.md)
+walks through the example above in full.
+
+## Citation
+
+To cite poolinfo, use `citation("poolinfo")`. The diagnostics are those
+of
+
+Lee, J. (2026). The geometry of informativeness: A Bregman-centroid
+diagnostic for partial pooling in multisite trials. Unpublished
+manuscript.
+
+## Funding
+
+This research was supported by the Institute of Education Sciences, U.S.
+Department of Education, through Grant R305D240078 to the University of
+Alabama. The opinions expressed are those of the author and do not
+represent views of the Institute or the U.S. Department of Education.
+
+# Package index
+
+## Posterior summaries
+
+The posterior distribution of the diagnostics given the site estimates
+and their standard errors, and what can be read from it. Proper SD
+priors and mean models with covariates are experimental extensions.
+
+- [`reliability_posterior()`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`format(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`print(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`summary(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`format(`*`<summary.reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`print(`*`<summary.reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`update(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  [`as.data.frame(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_posterior.md)
+  : Posterior summaries of the reliability profile
+- [`sd_prior()`](https://joonho112.github.io/poolinfo/reference/sd_prior.md)
+  : Prior distribution of the between-site standard deviation
+- [`posterior_control()`](https://joonho112.github.io/poolinfo/reference/posterior_control.md)
+  : Settings of the posterior computation
+- [`profile_summary()`](https://joonho112.github.io/poolinfo/reference/profile_summary.md)
+  : Summaries of a profile as a data frame
+- [`site_table()`](https://joonho112.github.io/poolinfo/reference/site_table.md)
+  : Site table of a profile
+- [`prob_above()`](https://joonho112.github.io/poolinfo/reference/prob_above.md)
+  : Posterior probability that a diagnostic exceeds a value
+- [`plugin_gap()`](https://joonho112.github.io/poolinfo/reference/plugin_gap.md)
+  : Posterior means against plug-in values
+- [`functional_density()`](https://joonho112.github.io/poolinfo/reference/functional_density.md)
+  : Posterior density of a diagnostic
+- [`profile_draws()`](https://joonho112.github.io/poolinfo/reference/profile_draws.md)
+  : Draws from the posterior
+- [`check_numerics()`](https://joonho112.github.io/poolinfo/reference/check_numerics.md)
+  : Numerical checks of a posterior fit
+
+## Profiles at a fixed between-site SD
+
+The reliability profile when the between-site standard deviation is
+given, for example from a REML fit or a planning value.
+
+- [`reliability_profile()`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`update(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`format(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`print(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`summary(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`format(`*`<summary.reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`print(`*`<summary.reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  [`as.data.frame(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/reliability_profile.md)
+  : Reliability profile at a fixed between-site SD
+
+## Fits from other packages
+
+Diagnostics from posterior draws, from a confidence interval for the
+between-site variance, and from fits of metafor, ebnm and multisiteDGP.
+External-draw summaries and confidence-interval mapping are experimental
+extensions whose interfaces may change in a later 0.x release.
+
+- [`reliability_draws()`](https://joonho112.github.io/poolinfo/reference/reliability_draws.md)
+  : Diagnostics from posterior draws of the between-site SD
+- [`map_tau2_interval()`](https://joonho112.github.io/poolinfo/reference/map_tau2_interval.md)
+  : Confidence interval for the between-site variance mapped through the
+  diagnostics
+- [`reliability_profile(`*`<rma.uni>`*`)`](https://joonho112.github.io/poolinfo/reference/metafor-methods.md)
+  [`reliability_profile(`*`<rma>`*`)`](https://joonho112.github.io/poolinfo/reference/metafor-methods.md)
+  : Profiles and posteriors of metafor fits
+- [`reliability_profile(`*`<ebnm>`*`)`](https://joonho112.github.io/poolinfo/reference/ebnm-methods.md)
+  : Profiles of ebnm fits with a normal prior
+- [`reliability_profile(`*`<multisitedgp_data>`*`)`](https://joonho112.github.io/poolinfo/reference/multisitedgp-methods.md)
+  : Profiles and posteriors of simulated multisite data
+
+## Plots
+
+Every plot is a ggplot object, or a patchwork object for several panels.
+
+### Analysis
+
+- [`plot_profile()`](https://joonho112.github.io/poolinfo/reference/plot_profile.md)
+  : Reliability profile plot
+- [`plot_pooling()`](https://joonho112.github.io/poolinfo/reference/plot_pooling.md)
+  : Pooling plot
+- [`plot_functionals()`](https://joonho112.github.io/poolinfo/reference/plot_functionals.md)
+  : Plot of the posterior density of a diagnostic
+- [`plot_plane()`](https://joonho112.github.io/poolinfo/reference/plot_plane.md)
+  : Informativeness and logit variance plane
+- [`plot_dashboard()`](https://joonho112.github.io/poolinfo/reference/plot_dashboard.md)
+  : Dashboard of a posterior fit
+- [`plot_compare()`](https://joonho112.github.io/poolinfo/reference/plot_compare.md)
+  : Comparison plot
+- [`plot_sigma_scale()`](https://joonho112.github.io/poolinfo/reference/plot_sigma_scale.md)
+  : Posterior of sigma_tau on the scale of the informativeness
+- [`plot(`*`<reliability_profile>`*`)`](https://joonho112.github.io/poolinfo/reference/plot.poolinfo.md)
+  [`plot(`*`<reliability_posterior>`*`)`](https://joonho112.github.io/poolinfo/reference/plot.poolinfo.md)
+  [`plot(`*`<reliability_draws>`*`)`](https://joonho112.github.io/poolinfo/reference/plot.poolinfo.md)
+  [`plot(`*`<reliability_design>`*`)`](https://joonho112.github.io/poolinfo/reference/plot.poolinfo.md)
+  : Plots of poolinfo objects
+
+### Diagnostics
+
+- [`plot_gap_path()`](https://joonho112.github.io/poolinfo/reference/plot_gap_path.md)
+  : Dispersion and centroid gap along the informativeness
+- [`plot_concentration()`](https://joonho112.github.io/poolinfo/reference/plot_concentration.md)
+  : Concentration of the reliability
+- [`plot_contributions()`](https://joonho112.github.io/poolinfo/reference/plot_contributions.md)
+  : Sites' terms of the dispersion
+
+### Geometry
+
+- [`plot_geometry()`](https://joonho112.github.io/poolinfo/reference/plot_geometry.md)
+  : Geometry of the Kullback-Leibler centroid
+- [`plot_decomposition()`](https://joonho112.github.io/poolinfo/reference/plot_decomposition.md)
+  : Decomposition of the average divergence
+
+### Design
+
+- [`plot_design()`](https://joonho112.github.io/poolinfo/reference/plot_design.md)
+  : Design plots
+
+## Comparing analyses
+
+Several outcomes, scales, subsets or priors side by side.
+
+- [`compare_profiles()`](https://joonho112.github.io/poolinfo/reference/compare_profiles.md)
+  [`plot(`*`<profile_comparison>`*`)`](https://joonho112.github.io/poolinfo/reference/compare_profiles.md)
+  : Diagnostics of several analyses side by side
+- [`prior_sensitivity()`](https://joonho112.github.io/poolinfo/reference/prior_sensitivity.md)
+  : Posterior summaries under several priors
+
+## Reporting
+
+Tables and sentences for a report, with the conditioning they rest on.
+
+- [`report_table()`](https://joonho112.github.io/poolinfo/reference/report_table.md)
+  : Table of the diagnostics for a report
+- [`report_text()`](https://joonho112.github.io/poolinfo/reference/report_text.md)
+  : Sentences for a report
+
+## Planning
+
+Sampling variances, profiles and allocations of a trial before any data
+are collected.
+
+- [`neyman_variance()`](https://joonho112.github.io/poolinfo/reference/neyman_variance.md)
+  : Sampling variances of a planned trial
+- [`reliability_design()`](https://joonho112.github.io/poolinfo/reference/reliability_design.md)
+  : Reliability profile of a planned allocation
+- [`balanced_allocation()`](https://joonho112.github.io/poolinfo/reference/balanced_allocation.md)
+  : Site allocations under size and budget constraints
+- [`solve_design()`](https://joonho112.github.io/poolinfo/reference/solve_design.md)
+  : Sizes that reach a target informativeness
+- [`imbalance_ratio()`](https://joonho112.github.io/poolinfo/reference/imbalance_ratio.md)
+  : Ratio of the geometric to the arithmetic mean site size
+
+## Diagnostics of a profile
+
+The informativeness, the mean reliability, the dispersion and the
+concentration count of a set of site reliabilities, and the quantities
+related to them.
+
+- [`site_reliability()`](https://joonho112.github.io/poolinfo/reference/site_reliability.md)
+  : Site reliabilities
+- [`kl_centroid()`](https://joonho112.github.io/poolinfo/reference/kl_centroid.md)
+  : Informativeness of a reliability profile
+- [`reliability_centroids()`](https://joonho112.github.io/poolinfo/reference/reliability_centroids.md)
+  : Three centroids of a reliability profile
+- [`kl_dispersion()`](https://joonho112.github.io/poolinfo/reference/kl_dispersion.md)
+  [`kl_contributions()`](https://joonho112.github.io/poolinfo/reference/kl_dispersion.md)
+  : Dispersion of a reliability profile
+- [`concentration_count()`](https://joonho112.github.io/poolinfo/reference/concentration_count.md)
+  : Concentration count of a reliability profile
+- [`logit_moments()`](https://joonho112.github.io/poolinfo/reference/logit_moments.md)
+  : Logit variance and third absolute moment
+- [`local_terms()`](https://joonho112.github.io/poolinfo/reference/local_terms.md)
+  : Second-order terms of the dispersion and of the centroid gap
+- [`typical_variance()`](https://joonho112.github.io/poolinfo/reference/typical_variance.md)
+  : Typical sampling variance of Higgins and Thompson
+- [`benchmark_risk()`](https://joonho112.github.io/poolinfo/reference/benchmark_risk.md)
+  : Benchmark risk of a reliability profile
+- [`bregman_centroid()`](https://joonho112.github.io/poolinfo/reference/bregman_centroid.md)
+  [`bregman_dispersion()`](https://joonho112.github.io/poolinfo/reference/bregman_centroid.md)
+  : Bregman centroids and dispersions of a reliability profile
+- [`profile_path()`](https://joonho112.github.io/poolinfo/reference/profile_path.md)
+  : Dispersion and centroid gap along a path of informativeness
+- [`shape_profile()`](https://joonho112.github.io/poolinfo/reference/shape_profile.md)
+  : Sampling variances with a given informativeness and logit variance
+
+## Data sets
+
+- [`ocrs`](https://joonho112.github.io/poolinfo/reference/ocrs.md) :
+  Online Credit Recovery Study
+- [`eight_schools`](https://joonho112.github.io/poolinfo/reference/eight_schools.md)
+  : Eight schools
+- [`example_profiles`](https://joonho112.github.io/poolinfo/reference/example_profiles.md)
+  : Example reliability profiles
+
+## Package
+
+- [`poolinfo`](https://joonho112.github.io/poolinfo/reference/poolinfo-package.md)
+  [`poolinfo-package`](https://joonho112.github.io/poolinfo/reference/poolinfo-package.md)
+  : poolinfo: Reliability-Profile Diagnostics for Partial Pooling
+
+# Articles
+
+### Get started
+
+- [Getting started with
+  poolinfo](https://joonho112.github.io/poolinfo/articles/poolinfo.md):
+
+  Fit the posterior of a multisite trial’s reliability profile, read the
+  diagnostics and report them, with the course passing outcome of the
+  Online Credit Recovery Study.
+
+### Case studies
+
+- [A multisite trial: the Online Credit Recovery
+  Study](https://joonho112.github.io/poolinfo/articles/multisite-trial.md):
+
+  A case study: the reliability profiles of two outcomes, two subjects,
+  a covariate adjustment and three first-stage analyses of passing in
+  one trial, the sensitivity to schools that appear twice, and a table
+  for the report.
+
+- [Study reliabilities in a
+  meta-analysis](https://joonho112.github.io/poolinfo/articles/meta-analysis.md):
+
+  The reliabilities of the studies of a random-effects meta-analysis
+  fitted with metafor: the informativeness beside metafor’s I^2,
+  confidence intervals mapped through the diagnostics, the posterior and
+  the restricted likelihood, a proper prior, and a moderator.
+
+- [Small area estimation with a Fay-Herriot
+  model](https://joonho112.github.io/poolinfo/articles/small-area-estimation.md):
+
+  The reliability profile of an area-level Fay-Herriot model: direct
+  estimates of many areas with design-based variances, a covariate in
+  the mean, how the total reliability is spread over the areas, and the
+  EBLUP.
+
+### Guides
+
+- [Reliability profiles and their
+  summaries](https://joonho112.github.io/poolinfo/articles/reliability-profiles.md):
+
+  What the informativeness, the mean reliability, the dispersion and the
+  concentration count describe, shown with profiles that have the same
+  informativeness but different shapes.
+
+- [Posterior summaries of the
+  diagnostics](https://joonho112.github.io/poolinfo/articles/posterior-summaries.md):
+
+  Where the posterior means, intervals and probabilities of the
+  diagnostics come from: the model and the prior, posterior means
+  against plug-in values, central intervals and the interval for H, the
+  prior when there are few sites, and posterior draws.
+
+- [Planning a multisite
+  trial](https://joonho112.github.io/poolinfo/articles/planning.md):
+
+  The reliability profile of a planned trial: sampling variances from
+  site sizes, unequal site sizes, the number of sites against the size
+  per site, and allocations under a budget.
+
+- [Computation and
+  reproducibility](https://joonho112.github.io/poolinfo/articles/implementation.md):
+
+  How poolinfo computes its posterior summaries and how accurate they
+  are: the posterior of the between-site standard deviation, the
+  quadrature rule and its checks, the adaptive engine, the tolerances of
+  the tests, the reproduction of the paper’s numbers, the derivations
+  beyond the paper, and the paper’s notation.

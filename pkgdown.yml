@@ -1,0 +1,16 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  implementation: implementation.html
+  meta-analysis: meta-analysis.html
+  multisite-trial: multisite-trial.html
+  planning: planning.html
+  poolinfo: poolinfo.html
+  posterior-summaries: posterior-summaries.html
+  reliability-profiles: reliability-profiles.html
+  small-area-estimation: small-area-estimation.html
+last_built: 2026-10-15T14:47Z
+urls:
+  reference: https://joonho112.github.io/poolinfo/reference
+  article: https://joonho112.github.io/poolinfo/articles
