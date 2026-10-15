@@ -1,0 +1,19 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+*.Rproj
+
+# R CMD build and check output
+poolinfo.Rcheck/
+poolinfo_*.tar.gz
+
+# What a plot leaves behind when no device is open
+Rplots.pdf
+
+# The site is built and deployed by a workflow
+docs/
+
+# Written by knitr when a vignette is knitted from the package root
+/figure/

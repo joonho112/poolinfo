@@ -1,0 +1,439 @@
+---
+title: "Posterior summaries of the diagnostics"
+description: "Where the posterior means, intervals and probabilities of the diagnostics come from: the model and the prior, posterior means against plug-in values, central intervals and the interval for H, the prior when there are few sites, and posterior draws."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Posterior summaries of the diagnostics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) {
+  knitr::opts_chunk$set(dev = "ragg_png")
+}
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+# Bounds in the text are rounded outward, so that they stay true.
+up <- function(x, digits = 2) num(ceiling(x * 10^digits - 1e-9) / 10^digits, digits)
+sci <- function(x) formatC(x, format = "e", digits = 1)
+pct <- function(x) round(100 * x)
+has_metafor <- requireNamespace("metafor", quietly = TRUE)
+```
+
+`reliability_posterior()` reports a posterior mean and a 95% posterior
+interval for each diagnostic, and the posterior probability that the
+informativeness $I$ exceeds 1/2. In this vignette we explain where these
+numbers come from and which choices lie behind them. We start with the model
+and its prior, compare a posterior mean with a plug-in value, and explain
+the interval for the dispersion $H$. We then come back to the prior for
+trials with few sites, and end with posterior draws, for summaries that the
+package does not compute. Our examples are the eight schools of @rubin1981
+and the passing outcome of the Online Credit Recovery Study [@rickles2024].
+
+```{r library}
+library(poolinfo)
+```
+
+## The model and the prior
+
+We work with the normal hierarchical model in which site $j$'s estimate
+$\hat\tau_j$ has a known sampling variance $v_j$,
+
+$$
+\hat\tau_j \mid \tau_j \sim N(\tau_j, v_j), \qquad
+\tau_j \sim N(\mu, \sigma_\tau^2), \qquad j = 1, \dots, J,
+$$
+
+independently over sites. By default the prior is flat on the mean $\mu$ and
+on the between-site standard deviation $\sigma_\tau$. A prior flat on
+$\sigma_\tau$ is not flat on the variance. As a density in $\sigma_\tau^2$
+it is proportional to $1/\sigma_\tau$, so it puts less weight on large
+variances than a flat prior on $\sigma_\tau^2$ would [@gelman2006].
+Integrating $\mu$ out leaves a posterior for $\sigma_\tau$ alone, known up
+to a constant, and `vignette("implementation")` gives its formula. Every
+diagnostic depends only on $\sigma_\tau$ and the $v_j$, so its posterior
+mean, its quantiles and the probability that it exceeds a value are
+one-dimensional integrals over that posterior. Because the package computes
+them by quadrature rather than simulation, they have no Monte Carlo error.
+
+Our first example, `eight_schools`, has the estimated effects of coaching on
+the SAT-V in eight schools, with their standard errors. We fit the
+posterior.
+
+```{r eight-fit}
+schools <- reliability_posterior(estimate, se = se, site = school,
+                                 data = eight_schools,
+                                 scale_label = "SAT-V point")
+schools
+```
+
+```{r eight-facts, include = FALSE}
+ps <- profile_summary(schools)
+val <- function(q, col = "mean") ps[[col]][ps$quantity == q]
+gm_se <- exp(mean(log(eight_schools$se)))
+sigma_c <- sqrt(gm_se^2 * 0.5 / (1 - 0.5))
+stopifnot(
+  val("sigma_tau", "upper") / val("sigma_tau", "lower") > 50,
+  val("I", "lower") < 0.005, val("I", "upper") < 0.75,
+  max(eight_schools$se) == 18, min(eight_schools$se) == 9,
+  abs(prob_above(schools) -
+        prob_above(schools, threshold = gm_se, which = "sigma_tau")) < 1e-12,
+  abs(sigma_c - gm_se) < 1e-12
+)
+```
+
+The posterior of $\sigma_\tau$ is wide. Its 95% interval runs from
+`r num(val("sigma_tau", "lower"))` to `r num(val("sigma_tau", "upper"), 1)`
+SAT-V points, and the interval for $I$ runs from `r num(val("I", "lower"))`
+to `r num(val("I", "upper"))`.
+
+In the last block, Pr(I > 0.5)
+is the posterior probability that $\sigma_\tau^2$ exceeds $\mathrm{GM}(v)$,
+the geometric mean of the sampling variances. The threshold 1/2 is where the
+leading term of $\bar S - I$ changes sign [@lee2026, Proposition 2], as
+`vignette("poolinfo")` explains.
+
+`plot_sigma_scale()` plots the posterior density of $\sigma_\tau$ with a
+second axis for $I$, and shades the region where $I$ exceeds 1/2.
+
+```{r sigma-scale, fig.alt = "The posterior density of sigma_tau for the eight schools, highest at 0 and falling, with a second axis for the informativeness and the region where it exceeds 1/2 shaded."}
+plot_sigma_scale(schools)
+```
+
+```{r sigma-facts, include = FALSE}
+dens_sigma <- functional_density(schools, "sigma_tau")
+stopifnot(all(diff(dens_sigma$density) < 0))
+if (has_metafor) {
+  reml8 <- metafor::rma(estimate, sei = se, data = eight_schools,
+                        method = "REML")
+  stopifnot(reml8$tau2 < 1e-8)
+}
+```
+
+The density is highest at 0 and falls steadily. The shading starts at
+$\sigma_\tau = \sqrt{\mathrm{GM}(v)} = `r num(gm_se, 1)`$ points, where
+$I = 1/2$, and `r num(prob_above(schools), 3)` of the probability lies
+beyond it. Because $I$ increases with $\sigma_\tau$, each quantile of $I$ is
+$I$ at the same quantile of $\sigma_\tau$, which the top axis lets you read
+off.
+
+## Posterior means and plug-in values
+
+The printed fit gives the posterior mean of $I$ in its first row and, in its
+last line, $I$ at the posterior mean of $\sigma_\tau^2$. That is the value
+you would get by putting this estimate of $\sigma_\tau^2$ into the formula
+for $I$. `plugin_gap()` gives both, and their difference, for four
+diagnostics.
+
+```{r gap}
+print(plugin_gap(schools), digits = 3)
+```
+
+```{r gap-facts, include = FALSE}
+gap <- plugin_gap(schools)
+q <- schools$quantiles
+median_sigma2 <- q$median[q$quantity == "sigma_tau2"]
+stopifnot(all(gap$difference > 0), gap$difference[1] > 0.1,
+          val("sigma_tau2") > 2 * median_sigma2)
+```
+
+For the eight schools the two values of $I$ are far apart,
+`r num(gap$posterior_mean[1], 3)` against `r num(gap$at_mean_sigma2[1], 3)`.
+The posterior mean averages $I$ over the values of $\sigma_\tau$ that the
+data allow. The plug-in value first averages $\sigma_\tau^2$ and then
+applies $I$, and the long right tail pulls the posterior mean of
+$\sigma_\tau^2$, `r num(val("sigma_tau2"), 1)`, far above its median,
+`r num(median_sigma2, 1)`. Whatever the data, $I$ is a concave function of
+$\sigma_\tau^2$. By Jensen's inequality, then, its posterior mean is at most
+its value at the posterior mean of $\sigma_\tau^2$, with equality only when
+the posterior of $\sigma_\tau^2$ is a point mass [@lee2026, Proposition 3].
+The same holds for every $S_j$, and so for $\bar S$.
+
+Proposition 3 gives no such order for $H$ and $J_{\mathrm{eff}}$, and the
+positive differences in their rows are a property of these data. For the
+passing outcome of the credit recovery study, with 32 sites, the difference
+for $H$ is negative.
+
+```{r passing-gap}
+passing <- reliability_posterior(estimate, se = se, data = ocrs)
+print(plugin_gap(passing), digits = 3)
+```
+
+```{r passing-gap-facts, include = FALSE}
+gap_passing <- plugin_gap(passing)
+stopifnot(all(gap_passing$difference[1:2] > 0),
+          gap_passing$difference[3] < 0)
+```
+
+Here $I$ and $\bar S$ again come out larger at the posterior mean of
+$\sigma_\tau^2$, as they must, while $H$ comes out smaller, by
+`r sci(-gap_passing$difference[3])`.
+
+A third number is common in practice, $I$ at a point estimate of
+$\sigma_\tau^2$ such as the REML estimate. For the eight schools that
+estimate is 0, which makes every reliability 0. `reliability_profile()`
+computes the profile at any value of $\sigma_\tau$, or at the estimate of a
+metafor fit, but such a profile carries no uncertainty about $\sigma_\tau$.
+
+## Intervals
+
+The posterior intervals are central, with 2.5% of the posterior probability
+below the lower end and 2.5% above the upper end. We use central intervals
+because they carry over through increasing functions. $I$, $\bar S$ and
+$J_{\mathrm{eff}}$ increase with $\sigma_\tau$, so the ends of their
+intervals are their values at the 2.5% and 97.5% quantiles of $\sigma_\tau$.
+A highest-density interval does not carry over in general, since a nonlinear
+change of scale moves the region of highest density. For the eight schools
+it would also run from 0, where the density of $\sigma_\tau$ is highest, to
+the 95% quantile.
+
+```{r interval-facts, include = FALSE}
+gm_v <- gm_se^2
+s_lo <- val("sigma_tau", "lower")
+s_hi <- val("sigma_tau", "upper")
+H_max <- schools$h_branches$H_max
+path <- profile_path(schools, n = 20001)
+above <- path$sigma_tau[path$H >= val("H", "upper")]
+stopifnot(
+  abs(val("I", "lower") - s_lo^2 / (s_lo^2 + gm_v)) < 1e-12,
+  abs(val("I", "upper") - s_hi^2 / (s_hi^2 + gm_v)) < 1e-12,
+  val("H", "upper") < H_max, H_max - val("H", "upper") < 0.01 * H_max,
+  abs(prob_above(schools, min(above), "sigma_tau") -
+        prob_above(schools, max(above), "sigma_tau") - 0.025) < 0.002
+)
+```
+
+The dispersion $H$ needs more care. It is 0 at $\sigma_\tau = 0$, peaks
+where $\bar S = I$, and returns toward 0 as $\sigma_\tau$ grows, so each
+value of $H$ below the peak comes from two values of $\sigma_\tau$. The
+package adds the posterior probabilities of the two branches to get the
+distribution function of $H$, and solves it for the quantiles. For the eight
+schools the interval for $H$ runs from `r num(val("H", "lower"), 5)` to
+`r num(val("H", "upper"), 5)`, just below the largest value that $H$ can
+take with these standard errors, `r num(H_max, 5)`. The upper end is so
+close to the largest value because $H$ is flat near its peak. Every
+$\sigma_\tau$ from `r num(min(above), 1)` to `r num(max(above), 1)` points
+gives a value of $H$ above the upper end, and these values of $\sigma_\tau$
+carry the remaining 2.5% of the probability.
+
+`functional_density()` returns the posterior density of a diagnostic on a
+grid, by a change of variables from the density of $\sigma_\tau$, and
+`plot_functionals()` plots it with the posterior mean, the plug-in value and
+the 95% interval.
+
+```{r density, fig.alt = "The posterior density of the informativeness for the eight schools, unbounded near 0, with the posterior mean as a solid line, the value at the posterior mean of sigma_tau squared as a dashed line and the 95% interval shaded."}
+plot_functionals(schools)
+```
+
+```{r density-facts, include = FALSE}
+dens_I <- functional_density(schools, "I")
+priors_all <- list(sd_prior("half_normal", scale = 10),
+                   sd_prior("half_t", scale = 10, df = 3),
+                   sd_prior("half_cauchy", scale = 5),
+                   sd_prior("uniform", upper = 50))
+at_zero <- vapply(priors_all, function(p) {
+  functional_density(update(schools, prior = p), "sigma_tau")$density[1]
+}, 0)
+stopifnot(all(diff(dens_I$density) < 0), dens_I$density[1] > 100,
+          dens_sigma$density[1] > 0, all(at_zero > 0))
+```
+
+The solid line marks the posterior mean of $I$,
+`r num(gap$posterior_mean[1], 3)`, the dashed line the plug-in value,
+`r num(gap$at_mean_sigma2[1], 3)`, and the shading the interval up to
+`r num(val("I", "upper"))`. Near $I = 0$ the density is unbounded, and the
+plot cuts its vertical axis. Under the flat prior, as under every prior that
+`sd_prior()` offers, the posterior density of $\sigma_\tau$ is positive at
+0. Close to 0 the informativeness is nearly $\sigma_\tau^2/\mathrm{GM}(v)$,
+so the density of $I$ grows like $I^{-1/2}$ as $I$ approaches 0. A gray line
+marks the threshold 1/2.
+
+`prob_above()` computes the posterior probability that $I$, $\bar S$,
+$J_{\mathrm{eff}}$ or $\sigma_\tau$ itself exceeds a value. We ask for the
+probability that $\sigma_\tau$ exceeds 5 SAT-V points.
+
+```{r prob}
+prob_above(schools, threshold = 5, which = "sigma_tau")
+```
+
+```{r prob-facts, include = FALSE}
+p5 <- prob_above(schools, threshold = 5, which = "sigma_tau")
+stopifnot(p5 > 0.5, p5 < 0.55)
+```
+
+It is `r num(p5)`, a little over a half.
+
+## Few sites and the prior
+
+With few sites the posterior of $\sigma_\tau$ is wide, and the prior
+matters. Under the flat prior, the package's default and the prior of
+@lee2026, the
+posterior is proper only with at least 3 sites, the posterior mean of
+$\sigma_\tau$ exists only with at least 4, and that of $\sigma_\tau^2$ only
+with at least 5. `?sd_prior` gives these counts for a mean model and for the
+other priors. When a posterior mean does not exist, the printed fit reports
+it as not defined. We fit the first 4 of the eight schools.
+
+```{r four}
+four <- reliability_posterior(estimate, se = se, data = eight_schools[1:4, ])
+four
+```
+
+```{r four-facts, include = FALSE}
+ps4 <- profile_summary(four)
+I4 <- ps4$mean[ps4$quantity == "I"]
+sigma4_upper <- ps4$upper[ps4$quantity == "sigma_tau"]
+p20_4 <- prob_above(four, threshold = 20, which = "sigma_tau")
+p20_8 <- prob_above(schools, threshold = 20, which = "sigma_tau")
+proper4 <- update(four, prior = sd_prior("half_normal", scale = 10))
+proper8 <- update(schools, prior = sd_prior("half_normal", scale = 10))
+proper_I4 <- proper4$summary$mean[proper4$summary$quantity == "I"]
+proper_I8 <- proper8$summary$mean[proper8$summary$quantity == "I"]
+stopifnot(I4 > 1.8 * val("I"), sigma4_upper > 80, p20_4 > 5 * p20_8, proper_I4 > proper_I8,
+          all(diff(functional_density(four, "sigma_tau")$density) < 0))
+if (has_metafor) {
+  reml4 <- metafor::rma(estimate, sei = se, data = eight_schools[1:4, ],
+                        method = "REML")
+  stopifnot(reml4$tau2 < 1e-8)
+}
+```
+
+The posterior mean of $I$ is now `r num(I4)`, against `r num(val("I"))` with
+all 8 schools, and the 95% interval of $\sigma_\tau$ reaches
+`r num(sigma4_upper, 0)` points. For both sets the REML estimate of
+$\sigma_\tau$ is 0, but four schools say less about $\sigma_\tau$ than
+eight. Under the flat prior the posterior density of $\sigma_\tau$ falls
+off like $\sigma_\tau^{1-J}$, slowly when $J = 4$, and the posterior
+probability that $\sigma_\tau$ exceeds 20 points is `r num(p20_4)` with 4
+schools against `r num(p20_8)` with 8. The posterior mean of
+$\sigma_\tau^2$ does not exist with 4 sites, so the printout has no plug-in
+value. Under a half-normal prior with scale 10 the two sets differ as well,
+with posterior means of $I$ of `r num(proper_I4)` and `r num(proper_I8)`.
+
+Proper priors on $\sigma_\tau$ are a common alternative when there are few
+sites, such as half-normal or half-t priors with a scale on the scale of the
+effects [@gelman2006]. `sd_prior()` makes them, and `prior_sensitivity()`
+refits a posterior under each and collects the fits:
+
+```{r priors}
+prior_sensitivity(schools, list(
+  `half-normal, scale 10` = sd_prior("half_normal", scale = 10),
+  `half-t, scale 10, 3 df` = sd_prior("half_t", scale = 10, df = 3),
+  `half-Cauchy, scale 5` = sd_prior("half_cauchy", scale = 5)
+))
+```
+
+```{r prior-facts, include = FALSE}
+sens <- as.data.frame(prior_sensitivity(schools, list(
+  hn = sd_prior("half_normal", scale = 10),
+  ht = sd_prior("half_t", scale = 10, df = 3),
+  hc = sd_prior("half_cauchy", scale = 5)
+)))
+stopifnot(all(sens$I[-1] < sens$I[1]), all(sens$I_upper[-1] < sens$I_upper[1]))
+```
+
+All three put more weight on small values of $\sigma_\tau$ than the flat
+prior does. They pull the posterior mean of $I$ down from `r num(sens$I[1])`
+to between `r num(min(sens$I[-1]))` and `r num(max(sens$I[-1]))`, and the
+interval's upper end from `r num(sens$I_upper[1])` to between
+`r num(min(sens$I_upper[-1]))` and `r num(max(sens$I_upper[-1]))`. We would
+name the prior in any report on a trial this small, and show the fits under
+more than one.
+
+A given prior matters less as the number of sites grows. To see this with
+the trial and the scale of the effects held fixed, we refit the passing
+outcome in its 13 Algebra 1 sites, its 19 English 9 sites and all 32 sites,
+each under two half-normal priors. A scale of 0.1 is about 0.8 times the
+geometric-mean standard error $\sqrt{\mathrm{GM}(v)}$ in each set, as the scale 10
+is for the eight schools. A scale of 0.5, a between-site standard deviation
+of 50 percentage points, is far beyond any plausible spread of effects on
+passing, so that prior is weak. For each set we compute how far each prior
+moves the posterior mean of $I$ from its value under the flat prior.
+
+```{r sites-and-prior}
+half_normal <- list(`scale 0.1` = sd_prior("half_normal", scale = 0.1),
+                    `scale 0.5` = sd_prior("half_normal", scale = 0.5))
+subsets <- list(`Algebra 1` = ocrs[ocrs$subject == "Algebra 1", ],
+                `English 9` = ocrs[ocrs$subject == "English 9", ],
+                all = ocrs)
+shift <- sapply(subsets, function(d) {
+  fit <- reliability_posterior(estimate, se = se, data = d)
+  I <- as.data.frame(prior_sensitivity(fit, half_normal))$I
+  setNames(I[-1] - I[1], names(half_normal))
+})
+data.frame(sites = sapply(subsets, nrow), round(t(shift), 3),
+           check.names = FALSE)
+```
+
+```{r sites-and-prior-facts, include = FALSE}
+relative_scale <- sapply(subsets, function(d) 0.1 / exp(mean(log(d$se))))
+sd_I <- profile_summary(passing)$sd[1]
+stopifnot(
+  identical(unname(sapply(subsets, nrow)), c(13L, 19L, 32L)),
+  all(relative_scale > 0.7), all(relative_scale < 0.85),
+  abs(10 / gm_se - 0.82) < 0.01,
+  all(shift < 0), all(diff(abs(shift[1, ])) < 0),
+  all(abs(shift[2, ]) < 0.01),
+  abs(shift[1, 3]) / sd_I > 0.45, abs(shift[1, 3]) / sd_I < 0.65
+)
+```
+
+Under the prior with scale 0.1 the posterior mean of $I$ falls by
+`r num(-shift[1, 1], 3)` with 13 sites, `r num(-shift[1, 2], 3)` with 19 and
+`r num(-shift[1, 3], 3)` with 32. Under the weak prior it falls by
+`r up(-min(shift[2, ]), 3)` or less. So a weak prior hardly matters with 32
+sites, but a prior with a scale near the standard errors still moves $I$ by
+about half of its posterior standard deviation, `r num(sd_I, 3)`.
+
+## Draws
+
+Some summaries need posterior draws, for example those that involve several
+site effects at once. `profile_draws()` draws $\sigma_\tau$ by inverting its
+posterior distribution function, then the mean given $\sigma_\tau$, and,
+with `sites = TRUE`, the site effects given both. With `seed` the draws are
+reproducible, and the session's random number generator is left as it was.
+We use draws to find the posterior probability that school A, whose estimate
+is the largest, also has the largest effect:
+
+```{r draws}
+draws <- profile_draws(schools, ndraws = 4000, seed = 1, sites = TRUE)
+effects <- draws[, paste0("effect_", eight_schools$school)]
+top_A <- mean(apply(effects, 1, which.max) == 1)
+round(c(probability = top_A,
+        mcse = sqrt(top_A * (1 - top_A) / nrow(draws))), 4)
+```
+
+```{r draws-facts, include = FALSE}
+best <- table(factor(apply(effects, 1, which.max), levels = 1:8))
+mcse_A <- sqrt(top_A * (1 - top_A) / nrow(draws))
+stopifnot(which.max(best) == 1, which.max(eight_schools$estimate) == 1,
+          top_A > 0.2, top_A < 0.3)
+```
+
+School A has the largest effect in `r pct(top_A)`% of the draws, more often
+than any other school but far from always, because the model pulls the eight
+effects toward one another. The draws are independent, so the Monte Carlo
+standard error of this proportion is the binomial one, `r num(mcse_A, 3)`.
+Four times as many draws would halve it.
+
+Draws from other software go to `reliability_draws()`, which computes the
+diagnostics at each draw of $\sigma_\tau$ and reports their Monte Carlo
+standard errors. It reads a brms fit of this model directly, and
+`vignette("implementation")` has an example.
+
+## Integration checks
+
+The numerical integration is checked as each fit is made, and
+`check_numerics()` shows the results. If a check falls outside its limit,
+`reliability_posterior()` warns as it builds the fit.
+`vignette("implementation")` explains the checks and the other method of
+integration, `posterior_control(engine = "adaptive")`.
+
+## References

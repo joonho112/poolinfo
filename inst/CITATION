@@ -1,0 +1,24 @@
+bibentry(
+  bibtype = "Manual",
+  title = "{poolinfo}: Reliability-Profile Diagnostics for Partial Pooling",
+  author = person("JoonHo", "Lee"),
+  year = "2026",
+  note = paste0("R package version ", meta$Version),
+  url = "https://joonho112.github.io/poolinfo/",
+  textVersion = paste0(
+    "Lee, J. (2026). poolinfo: Reliability-profile diagnostics for partial pooling. ",
+    "R package version ", meta$Version, ". https://joonho112.github.io/poolinfo/"
+  )
+)
+
+bibentry(
+  bibtype = "Unpublished",
+  title = "The geometry of informativeness: A {B}regman-centroid diagnostic for partial pooling in multisite trials",
+  author = person("JoonHo", "Lee"),
+  year = "2026",
+  note = "Unpublished manuscript",
+  textVersion = paste(
+    "Lee, J. (2026). The geometry of informativeness: A Bregman-centroid",
+    "diagnostic for partial pooling in multisite trials. Unpublished manuscript."
+  )
+)

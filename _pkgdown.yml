@@ -1,0 +1,134 @@
+url: https://joonho112.github.io/poolinfo/
+
+template:
+  bootstrap: 5
+  bslib:
+    primary: "#0072B2"
+
+home:
+  title: "poolinfo: Reliability-Profile Diagnostics for Partial Pooling"
+
+reference:
+- title: Posterior summaries
+  desc: >
+    The posterior distribution of the diagnostics given the site estimates
+    and their standard errors, and what can be read from it. Proper SD priors
+    and mean models with covariates are experimental extensions.
+  contents:
+  - reliability_posterior
+  - sd_prior
+  - posterior_control
+  - profile_summary
+  - site_table
+  - prob_above
+  - plugin_gap
+  - functional_density
+  - profile_draws
+  - check_numerics
+- title: Profiles at a fixed between-site SD
+  desc: >
+    The reliability profile when the between-site standard deviation is
+    given, for example from a REML fit or a planning value.
+  contents:
+  - reliability_profile
+- title: Fits from other packages
+  desc: >
+    Diagnostics from posterior draws, from a confidence interval for the
+    between-site variance, and from fits of metafor, ebnm and multisiteDGP.
+    External-draw summaries and confidence-interval mapping are experimental
+    extensions whose interfaces may change in a later 0.x release.
+  contents:
+  - reliability_draws
+  - map_tau2_interval
+  - metafor-methods
+  - ebnm-methods
+  - multisitedgp-methods
+- title: Plots
+  desc: Every plot is a ggplot object, or a patchwork object for several panels.
+- subtitle: Analysis
+  contents:
+  - plot_profile
+  - plot_pooling
+  - plot_functionals
+  - plot_plane
+  - plot_dashboard
+  - plot_compare
+  - plot_sigma_scale
+  - plot.poolinfo
+- subtitle: Diagnostics
+  contents:
+  - plot_gap_path
+  - plot_concentration
+  - plot_contributions
+- subtitle: Geometry
+  contents:
+  - plot_geometry
+  - plot_decomposition
+- subtitle: Design
+  contents:
+  - plot_design
+- title: Comparing analyses
+  desc: Several outcomes, scales, subsets or priors side by side.
+  contents:
+  - compare_profiles
+  - prior_sensitivity
+- title: Reporting
+  desc: Tables and sentences for a report, with the conditioning they rest on.
+  contents:
+  - report_table
+  - report_text
+- title: Planning
+  desc: >
+    Sampling variances, profiles and allocations of a trial before any data
+    are collected.
+  contents:
+  - neyman_variance
+  - reliability_design
+  - balanced_allocation
+  - solve_design
+  - imbalance_ratio
+- title: Diagnostics of a profile
+  desc: >
+    The informativeness, the mean reliability, the dispersion and the
+    concentration count of a set of site reliabilities, and the quantities
+    related to them.
+  contents:
+  - site_reliability
+  - kl_centroid
+  - reliability_centroids
+  - kl_dispersion
+  - concentration_count
+  - logit_moments
+  - local_terms
+  - typical_variance
+  - benchmark_risk
+  - bregman_centroid
+  - profile_path
+  - shape_profile
+- title: Data sets
+  contents:
+  - ocrs
+  - eight_schools
+  - example_profiles
+- title: Package
+  contents:
+  - poolinfo-package
+
+articles:
+- title: Get started
+  navbar: ~
+  contents:
+  - poolinfo
+- title: Case studies
+  navbar: Case studies
+  contents:
+  - multisite-trial
+  - meta-analysis
+  - small-area-estimation
+- title: Guides
+  navbar: Guides
+  contents:
+  - reliability-profiles
+  - posterior-summaries
+  - planning
+  - implementation

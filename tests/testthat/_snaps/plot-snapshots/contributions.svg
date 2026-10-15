@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' data-engine-version='2.0' width='720.00pt' height='576.00pt' viewBox='0 0 720.00 576.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: #FFFFFF;'/>
+<defs>
+  <clipPath id='cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA='>
+    <rect x='0.00' y='0.00' width='720.00' height='576.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<rect x='0.00' y='0.00' width='720.00' height='576.00' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
+</g>
+<defs>
+  <clipPath id='cpNDAuMTN8NzE0LjUyfDIyLjc4fDUzNC43OQ=='>
+    <rect x='40.13' y='22.78' width='674.39' height='512.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpNDAuMTN8NzE0LjUyfDIyLjc4fDUzNC43OQ==)'>
+<polyline points='40.13,511.51 714.52,511.51 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,377.85 714.52,377.85 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,244.18 714.52,244.18 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,110.51 714.52,110.51 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<line x1='103.93' y1='511.51' x2='103.93' y2='480.09' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='186.77' y1='511.51' x2='186.77' y2='480.09' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='269.62' y1='511.51' x2='269.62' y2='388.62' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='352.47' y1='511.51' x2='352.47' y2='388.62' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='435.32' y1='511.51' x2='435.32' y2='371.74' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='518.17' y1='511.51' x2='518.17' y2='276.65' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='601.02' y1='511.51' x2='601.02' y2='216.96' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<line x1='683.87' y1='511.51' x2='683.87' y2='46.06' style='stroke-width: 1.49; stroke: #CC79A7; stroke-linecap: butt;' />
+<circle cx='103.93' cy='480.09' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='186.77' cy='480.09' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='269.62' cy='388.62' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='352.47' cy='388.62' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='435.32' cy='371.74' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='518.17' cy='276.65' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='601.02' cy='216.96' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<circle cx='683.87' cy='46.06' r='2.49' style='stroke-width: 0.71; stroke: #CC79A7; fill: #CC79A7;' />
+<line x1='40.13' y1='331.10' x2='714.52' y2='331.10' style='stroke-width: 1.07; stroke: #404040; stroke-dasharray: 2.85,2.85; stroke-linecap: butt;' />
+<text x='70.79' y='327.97' style='font-size: 9.10px; fill: #404040; font-family: sans;' textLength='44.81px' lengthAdjust='spacingAndGlyphs'>H = 0.0270</text>
+</g>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<text x='35.20' y='514.54' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.00</text>
+<text x='35.20' y='380.87' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.02</text>
+<text x='35.20' y='247.20' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.04</text>
+<text x='35.20' y='113.53' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.06</text>
+<text transform='translate(106.95,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>D</text>
+<text transform='translate(189.80,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.38px' lengthAdjust='spacingAndGlyphs'>F</text>
+<text transform='translate(272.65,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>B</text>
+<text transform='translate(355.50,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.85px' lengthAdjust='spacingAndGlyphs'>G</text>
+<text transform='translate(438.35,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>A</text>
+<text transform='translate(521.20,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>C</text>
+<text transform='translate(604.05,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>E</text>
+<text transform='translate(686.89,539.72) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>H</text>
+<text transform='translate(13.05,278.79) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: sans;' textLength='100.46px' lengthAdjust='spacingAndGlyphs'>KL(Ber(I) || Ber(S_j))</text>
+<text x='40.13' y='14.56' style='font-size: 13.20px; font-family: sans;' textLength='74.85px' lengthAdjust='spacingAndGlyphs'>contributions</text>
+<text x='5.48' y='558.48' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='354.02px' lengthAdjust='spacingAndGlyphs'>Each site's term KL(Ber(I) || Ber(S_j)), the divergence of I from the site's reliability; the</text>
+<text x='5.48' y='568.58' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='303.82px' lengthAdjust='spacingAndGlyphs'>dashed line is their mean, the dispersion H. At sigma_tau = 10 (supplied).</text>
+</g>
+</svg>

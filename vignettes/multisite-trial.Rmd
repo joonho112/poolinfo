@@ -1,0 +1,451 @@
+---
+title: "A multisite trial: the Online Credit Recovery Study"
+description: "A case study: the reliability profiles of two outcomes, two subjects, a covariate adjustment and three first-stage analyses of passing in one trial, the sensitivity to schools that appear twice, and a table for the report."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{A multisite trial: the Online Credit Recovery Study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) {
+  knitr::opts_chunk$set(dev = "ragg_png")
+}
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+pct <- function(x) round(100 * x)
+```
+
+One trial can give several sets of site estimates, for example one for
+each outcome, each subset of sites, each choice of covariates or each
+effect measure. poolinfo's diagnostics describe one such set together with
+its standard errors, so the same students can give different diagnostics.
+In this vignette we analyze the Online Credit Recovery Study as a whole,
+as Section 8 of @lee2026 does. We take its two outcomes, its two subjects,
+a covariate-adjusted analysis and three first-stage analyses of passing,
+and for each outcome we say what we would do next. If the informativeness
+$I$, the mean reliability $\bar S$, the dispersion $H$, the logit variance
+$V$ or the concentration count $J_{\mathrm{eff}}$ is new to you,
+`vignette("poolinfo")` defines them, with the passing outcome as its
+example.
+
+```{r library}
+library(poolinfo)
+```
+
+## The trial and its site estimates
+
+In the summers of 2018 and 2019, the study assigned students in Los
+Angeles high schools by lottery to one of two versions of their school's
+summer course, an online course or the usual course directed by a teacher
+[@rickles2024; @air2024]. All of them had failed Algebra 1 or English 9 in
+their first year. A site is one school's course in one subject, and the
+data set `ocrs` has a row for each site in which students were assigned to
+both versions. We count the sites in each subject and the schools, and
+summarize the sites' sizes.
+
+```{r data}
+table(ocrs$subject)
+length(unique(ocrs$school))
+summary(ocrs$n)
+```
+
+```{r data-facts, include = FALSE}
+n_algebra <- sum(ocrs$subject == "Algebra 1")
+n_schools <- length(unique(ocrs$school))
+n_paired <- sum(table(ocrs$school) == 2L)
+n_multi <- sum(ocrs$blocks > 1L)
+stopifnot(n_algebra == 13L, n_schools == 24L, n_paired == 8L,
+          all(table(ocrs$school) <= 2L), n_multi == 28L)
+```
+
+Of the `r nrow(ocrs)` sites, `r n_algebra` are in Algebra 1 and
+`r nrow(ocrs) - n_algebra` in English 9. They belong to `r n_schools`
+schools, so `r n_paired` schools have a site in each subject. A site has
+`r min(ocrs$n)` to `r max(ocrs$n)` students, and the median site has
+`r median(ocrs$n)`.
+
+Within each site, the estimate is the coefficient of the treatment
+indicator in a least squares regression of the outcome on that indicator
+and the randomization blocks, with the HC2 standard error. This
+coefficient is a weighted average of the blocks' differences between the
+two courses, with weights proportional to $n_k p_k (1 - p_k)$, where $n_k$
+is the size of block $k$ and $p_k$ the proportion of its students assigned
+to the online course. A block whose students all took the same course gets
+no weight. An average effect over all the site's students would weight
+each block by its size $n_k$ instead, and the two weightings differ in all
+`r n_multi` sites that have more than one block [@lee2026, Section 8 and
+Appendix G]. Each estimate is therefore a block-adjusted contrast, which
+can differ from the effect averaged over the site's students.
+
+`ocrs` contains five sets of site estimates, each with its standard
+errors:
+
+- `estimate`, `se`: course passing, as the block-adjusted difference in
+  the proportions passing.
+- `estimate_adjusted`, `se_adjusted`: the same regression with four
+  baseline covariates added, the grade 8 state test score in the subject
+  and the grade 9 GPA, each with an indicator of a missing value.
+- `estimate_credits`, `se_credits`: credits earned in the subject by the
+  end of the fourth year of high school, from the same regression as
+  `estimate`.
+- `estimate_unadjusted`, `se_unadjusted`: the difference in the
+  proportions passing between the two courses, ignoring the blocks.
+- `log_odds_ratio`, `se_log_odds_ratio`: the log odds ratio of passing,
+  from the same table of course by outcome as the unadjusted difference,
+  so it ignores the blocks too.
+
+`?ocrs` describes how each pair was computed from the study's public-use
+file. If you start from student records of your own, you compute such
+estimates and standard errors site by site and then pass them to poolinfo.
+
+## Outcomes, subjects and covariates
+
+We fit the posterior for passing in all `r nrow(ocrs)` sites and in each
+subject, for adjusted passing and for credits. Each fit records the scale
+of its effects and the estimand at each site (`scale_label` and
+`target_label`), which the table at the end repeats, and
+`compare_profiles()` collects the fits.
+
+```{r fits}
+rd <- "risk difference"
+itt <- "the block-adjusted intention-to-treat contrast for course passing"
+fit_passing <- function(data) {
+  reliability_posterior(estimate, se = se, site = site, data = data,
+                        scale_label = rd, target_label = itt)
+}
+algebra <- ocrs$subject == "Algebra 1"
+fits <- list(
+  passing = fit_passing(ocrs),
+  `passing, Algebra 1` = fit_passing(ocrs[algebra, ]),
+  `passing, English 9` = fit_passing(ocrs[!algebra, ]),
+  `passing, adjusted` = reliability_posterior(
+    estimate_adjusted, se = se_adjusted, site = site, data = ocrs,
+    scale_label = rd,
+    target_label = "the covariate-adjusted contrast for course passing"
+  ),
+  credits = reliability_posterior(
+    estimate_credits, se = se_credits, site = site, data = ocrs,
+    scale_label = "credit",
+    target_label = "the block-adjusted contrast for credits by year 4"
+  )
+)
+comparison <- compare_profiles(.list = fits)
+comparison
+```
+
+```{r fits-facts, include = FALSE}
+tab <- as.data.frame(comparison)
+rownames(tab) <- tab$analysis
+stat <- function(fit, q, col = "mean") {
+  ps <- profile_summary(fit)
+  ps[[col]][ps$quantity == q]
+}
+S_pass <- site_table(fits$passing)$reliability
+S_cred <- site_table(fits$credits)$reliability
+p_pass <- prob_above(fits$passing)
+p_cred <- prob_above(fits$credits)
+gm <- function(se) exp(mean(log(se)))
+grew <- sum(ocrs$se_adjusted > ocrs$se)
+adjusted <- fits[["passing, adjusted"]]
+width <- function(analysis) tab[analysis, "I_upper"] - tab[analysis, "I_lower"]
+stopifnot(
+  all(vapply(fits, function(f) all(f$checks$status == "ok"), NA)),
+  p_pass > 0.95, p_cred < 0.15,
+  tab["passing", "mean"] < tab["passing", "I"],
+  tab["credits", "mean"] > tab["credits", "I"],
+  stat(fits$passing, "effect_mean", "upper") < 0,
+  stat(fits$credits, "effect_mean", "lower") < 0,
+  stat(fits$credits, "effect_mean", "upper") > 0,
+  tab["passing, adjusted", "I"] < tab["passing", "I"],
+  grew > nrow(ocrs) / 2, gm(ocrs$se_adjusted) > gm(ocrs$se),
+  stat(adjusted, "sigma_tau") < stat(fits$passing, "sigma_tau"),
+  width("passing, Algebra 1") > width("passing"),
+  width("passing, English 9") > width("passing")
+)
+```
+
+Of these analyses, the two outcomes differ most. For passing, the
+posterior mean of $I$ is `r num(tab["passing", "I"])` (95% posterior interval
+`r num(tab["passing", "I_lower"])` to `r num(tab["passing", "I_upper"])`),
+so a site with the geometric-mean standard error keeps about
+`r pct(tab["passing", "I"])`% of its own estimate. For credits, $I$ is
+`r num(tab["credits", "I"])`
+(`r num(tab["credits", "I_lower"])` to `r num(tab["credits", "I_upper"])`),
+and such a site keeps only about `r pct(tab["credits", "I"])`% of its
+estimate. The posterior probability that $I$ exceeds 1/2, the value at
+which the model would move such a site halfway toward the mean effect,
+is `r num(p_pass)` for passing and `r num(p_cred)` for
+credits, with 1/2 as a reference point only. Site by site, the
+reliabilities run from `r num(min(S_pass))` to `r num(max(S_pass))` for
+passing and from `r num(min(S_cred))` to `r num(max(S_cred))` for credits,
+and the concentration counts are `r num(tab["passing", "J_eff"], 1)` and
+`r num(tab["credits", "J_eff"], 1)` of `r nrow(ocrs)`. For passing the
+mean reliability is a little below $I$
+(`r num(tab["passing", "mean"], 3)` against
+`r num(tab["passing", "I"], 3)`), and for credits a little above it
+(`r num(tab["credits", "mean"], 3)` against
+`r num(tab["credits", "I"], 3)`). These are the directions that the
+leading term of $\bar S - I$ gives when $I$ is above or below 1/2.
+
+In the average site, assignment to the online course lowered the
+proportion passing by
+`r num(-100 * stat(fits$passing, "effect_mean"), 1)` percentage points
+(95% posterior interval
+`r num(-100 * stat(fits$passing, "effect_mean", "upper"), 1)` to
+`r num(-100 * stat(fits$passing, "effect_mean", "lower"), 1)`). Its
+effect on the credits earned has a posterior mean of
+`r num(stat(fits$credits, "effect_mean"), 1)` credits
+(`r num(stat(fits$credits, "effect_mean", "lower"), 1)` to
+`r num(stat(fits$credits, "effect_mean", "upper"), 1)`).
+
+These diagnostics lead us to different next steps for the two outcomes.
+As @lee2026 concludes, the passing profile supports a closer look at the
+effects of the individual sites, starting from the posterior means and
+intervals of `site_table()`. Ranking the sites would still call for its
+own measure of uncertainty, because the diagnostics describe the
+estimates as a whole. The credits profile gives a more uncertain basis
+for such an analysis, and for credits we would report the mean effect
+and the between-site standard deviation before turning to individual
+sites.
+
+Adding the baseline covariates lowers $I$ for passing from
+`r num(tab["passing", "I"], 3)` to
+`r num(tab["passing, adjusted", "I"], 3)`. Covariates that predict the
+outcome usually shrink the standard errors, which would raise $I$. Here,
+though, the HC2 standard errors grew in `r grew` of the `r nrow(ocrs)`
+sites, and their geometric mean rose from `r num(gm(ocrs$se), 3)` to
+`r num(gm(ocrs$se_adjusted), 3)`. Meanwhile the posterior mean of
+$\sigma_\tau$ fell a little, from
+`r num(stat(fits$passing, "sigma_tau"), 3)` to
+`r num(stat(adjusted, "sigma_tau"), 3)`. Each analysis is conditional on
+its own standard errors, so a first-stage choice that changes them
+changes the diagnostics too.
+
+Each subject's analysis describes its own set of sites and has its own
+between-site standard deviation. With `r n_algebra` and
+`r nrow(ocrs) - n_algebra` sites, their posterior intervals for $I$ are
+wider than the pooled one: `r num(tab["passing, Algebra 1", "I_lower"])`
+to `r num(tab["passing, Algebra 1", "I_upper"])` for Algebra 1 and
+`r num(tab["passing, English 9", "I_lower"])` to
+`r num(tab["passing, English 9", "I_upper"])` for English 9. To analyze
+all `r nrow(ocrs)` sites together while letting the two subjects have
+different mean effects, we put the subject in the mean model instead. Each
+site is then pulled toward the mean of its subject, and $\sigma_\tau$
+describes the variation around the two means.
+
+```{r by-subject}
+by_subject <- reliability_posterior(estimate, se = se, site = site,
+                                    data = ocrs, mean_model = ~ subject)
+by_subject
+```
+
+```{r by-subject-facts, include = FALSE}
+english <- function(col) stat(by_subject, "coef_subjectEnglish 9", col)
+stopifnot(
+  all(by_subject$checks$status == "ok"),
+  english("mean") < 0, english("lower") < 0, english("upper") > 0,
+  abs(stat(by_subject, "sigma_tau") - stat(fits$passing, "sigma_tau")) < 0.001,
+  abs(stat(by_subject, "I") - tab["passing", "I"]) < 0.002
+)
+```
+
+In this fit the English 9 sites' mean effect is
+`r num(-100 * english("mean"), 1)` percentage points below that of the
+Algebra 1 sites, with a 95% posterior interval for the difference from
+`r num(-100 * english("lower"), 1)` points below to
+`r num(100 * english("upper"), 1)` points above. With $\sigma_\tau$ at
+`r num(stat(by_subject, "sigma_tau"), 3)`, as with a common mean, $I$ is
+`r num(stat(by_subject, "I"), 3)` against `r num(tab["passing", "I"], 3)`,
+so taking out the difference between the subjects leaves the variation
+between sites where it was.
+
+## Posteriors of the informativeness
+
+Next we compare the posterior densities of $I$ for the two outcomes. We
+keep the pair of fits in `outcomes`, which also gives the table at the end.
+
+```{r densities, fig.alt = "Posterior densities of the informativeness for passing and for credits, each with its posterior mean as a solid line, its value at the posterior mean of sigma_tau squared as a dashed line and its 95% posterior interval shaded; the credits density rises steeply at 0."}
+outcomes <- compare_profiles(passing = fits$passing, credits = fits$credits)
+plot_functionals(outcomes)
+```
+
+```{r density-facts, include = FALSE}
+# Under flat priors on the mean and on sigma_tau, the posterior density of
+# sigma_tau is proportional to the restricted likelihood, computed here.
+log_rl <- function(s, y, v) {
+  w <- 1 / (s^2 + v)
+  mu <- sum(w * y) / sum(w)
+  0.5 * (sum(log(w)) - log(sum(w)) - sum(w * (y - mu)^2))
+}
+height_at_0 <- function(y, se) {
+  peak <- optimize(log_rl, c(0, 10 * (max(abs(y)) + max(se))), y = y,
+                   v = se^2, maximum = TRUE)
+  exp(log_rl(0, y, se^2) - peak$objective)
+}
+h_pass <- height_at_0(ocrs$estimate, ocrs$se)
+h_cred <- height_at_0(ocrs$estimate_credits, ocrs$se_credits)
+dens <- functional_density(fits$credits, "sigma_tau", n = 2000)
+gap_of <- function(fit, col) {
+  g <- plugin_gap(fit)
+  g[[col]][g$functional == "I"]
+}
+stopifnot(
+  h_pass < 1e-6, h_cred > 0.05, h_cred < 0.15,
+  abs(dens$density[1] / max(dens$density) - h_cred) < 0.01,
+  tab["passing", "I_lower"] < tab["credits", "I_upper"],
+  gap_of(fits$passing, "difference") > 0,
+  gap_of(fits$credits, "difference") > gap_of(fits$passing, "difference")
+)
+```
+
+The shaded 95% posterior intervals overlap only between
+`r num(tab["passing", "I_lower"])` and `r num(tab["credits", "I_upper"])`.
+At the left edge the credits density rises without bound, and the plot
+cuts it off. This happens in every analysis under the flat prior, because
+the posterior density of $\sigma_\tau$ is positive at 0 and, near 0, $I$
+grows like $\sigma_\tau^2$. How much of it shows depends on how high the
+posterior of $\sigma_\tau$ is at 0. For passing that height is about
+`r sprintf("$10^{%d}$", round(log10(h_pass)))` of the posterior's peak, so
+nothing is visible, but for credits it is `r num(h_cred)` of the peak.
+
+Dashed lines mark $I$ at the posterior mean of $\sigma_\tau^2$,
+`r num(gap_of(fits$passing, "at_mean_sigma2"), 3)` for passing and
+`r num(gap_of(fits$credits, "at_mean_sigma2"), 3)` for credits. Both lie
+right of the solid lines, the posterior means, because $I$ is a concave
+function of $\sigma_\tau^2$ [@lee2026, Proposition 3], and the gap is
+`r num(gap_of(fits$passing, "difference"), 3)` for passing and
+`r num(gap_of(fits$credits, "difference"), 3)` for credits.
+
+## The contrast and the effect measure
+
+Reporting the effects in percentage points rather than proportions
+multiplies every estimate and standard error by 100. Under the flat prior
+the diagnostics stay the same, because $\sigma_\tau$ grows by the same
+factor as the standard errors [@lee2026, Appendix G]; a proper prior
+would need its scale multiplied too. A different contrast or a different
+effect measure is another kind of change, since it alters the spread of
+the true effects and the standard errors in different ways. We compare
+three analyses of passing: the block-adjusted difference used so far, the
+unadjusted difference in the proportions passing, and the log odds ratio.
+Both of the last two come from the same table of course by outcome in
+each site, so the step between them changes the effect measure alone.
+
+```{r scales}
+unadjusted <- reliability_posterior(estimate_unadjusted, se = se_unadjusted,
+                                    data = ocrs)
+log_odds <- reliability_posterior(log_odds_ratio, se = se_log_odds_ratio,
+                                  data = ocrs)
+scales <- compare_profiles(`difference, block-adjusted` = fits$passing,
+                           `difference, unadjusted` = unadjusted,
+                           `log odds ratio` = log_odds)
+scales
+```
+
+```{r scale-facts, include = FALSE}
+st <- as.data.frame(scales)
+rownames(st) <- c("block", "unadjusted", "lor")
+in_points <- reliability_posterior(100 * estimate, se = 100 * se, data = ocrs)
+# The contour band of the leading term of H at each point of the plane,
+# and the band of each posterior mean of H: 2 is between 0.02 and 0.03.
+band <- floor(100 * 0.5 * st$I * (1 - st$I) * st$V)
+stopifnot(
+  abs(stat(in_points, "I") - st["block", "I"]) < 1e-8,
+  st["block", "I"] > st["unadjusted", "I"],
+  st["unadjusted", "I"] > st["lor", "I"], st["lor", "I"] > 0.5,
+  st["lor", "V"] > st["block", "V"], st["block", "V"] > st["unadjusted", "V"],
+  identical(band, c(2, 2, 3)), identical(floor(100 * st$H), band)
+)
+```
+
+Dropping the blocks lowers $I$ from `r num(st["block", "I"], 3)` to
+`r num(st["unadjusted", "I"], 3)`, and the log odds ratio lowers it again,
+to `r num(st["lor", "I"], 3)`, with a posterior probability of
+`r num(prob_above(log_odds))` that $I$ exceeds 1/2. Next we place the
+three analyses in the plane of $I$ and $V$, with contours of the leading
+term of the dispersion, $I(1 - I)V/2$.
+
+```{r plane, fig.height = 5, fig.alt = "The three analyses of passing as points in the plane of the informativeness and the logit variance, each with the 95% posterior interval of its informativeness; the log odds ratio lies higher and further left than the two differences."}
+plot(scales, type = "plane")
+```
+
+The log odds ratio lies above the two differences in the plane, at
+$V = `r num(st["lor", "V"])`$ against `r num(st["unadjusted", "V"])` for
+the unadjusted difference and `r num(st["block", "V"])` for the
+block-adjusted one. Its sampling variance grows as a site's passing
+proportions approach 0 or 1, whereas a difference's is largest when they
+are near 1/2, so the two measures spread the same sites' standard errors
+differently. Both differences lie between the contours at
+`r num(band[1] / 100)` and `r num(band[1] / 100 + 0.01)`, and the log odds
+ratio between `r num(band[3] / 100)` and `r num(band[3] / 100 + 0.01)`, in
+line with their dispersions of `r num(st["block", "H"], 3)`,
+`r num(st["unadjusted", "H"], 3)` and `r num(st["lor", "H"], 3)`. In a
+report we would name both the contrast and the effect measure, as the
+labels of the fits for the outcomes do.
+
+## Schools with two sites
+
+Each of the `r n_paired` schools with a site in each subject contributes
+two estimates, and some of its students appear in both, while the model
+treats all `r nrow(ocrs)` sites as independent. Each site also counts once
+in the diagnostics, whatever its size, so these schools count twice. To
+see how much this matters, we keep one site of each such school, in all
+$2^{`r n_paired`} = `r 2^n_paired`$ ways, and refit both outcomes to each
+set of `r nrow(ocrs) - n_paired` sites.
+
+```{r schools}
+paired <- as.integer(names(which(table(ocrs$school) == 2)))
+choices <- expand.grid(rep(list(c("Algebra 1", "English 9")), length(paired)))
+I_of <- function(fit) subset(profile_summary(fit), quantity == "I")$mean
+I_subsets <- t(apply(choices, 1, function(subject) {
+  keep <- !(ocrs$school %in% paired) |
+    paste(ocrs$school, ocrs$subject) %in% paste(paired, subject)
+  sites <- ocrs[keep, ]
+  c(passing = I_of(reliability_posterior(estimate, se = se, data = sites)),
+    credits = I_of(reliability_posterior(estimate_credits, se = se_credits,
+                                         data = sites)))
+}))
+apply(I_subsets, 2, range)
+```
+
+```{r schools-facts, include = FALSE}
+stopifnot(nrow(I_subsets) == 2^n_paired,
+          all(I_subsets[, "passing"] > 0.5), all(I_subsets[, "credits"] < 0.5))
+```
+
+Across the `r nrow(I_subsets)` sets of `r nrow(ocrs) - n_paired` sites,
+the posterior mean of $I$ runs from `r num(min(I_subsets[, "passing"]), 3)`
+to `r num(max(I_subsets[, "passing"]), 3)` for passing and from
+`r num(min(I_subsets[, "credits"]), 3)` to
+`r num(max(I_subsets[, "credits"]), 3)` for credits, against
+`r num(tab["passing", "I"], 3)` and `r num(tab["credits", "I"], 3)` with
+all `r nrow(ocrs)` sites. Passing stays above 1/2 and credits below it in
+every set, so the contrast between the outcomes survives whichever site of
+a paired school we keep. These refits vary the set of sites. Allowing for
+the students who appear in both of a school's sites would take a model
+with the covariance between the school's two estimates, which the working
+model leaves out [@lee2026, Section 9].
+
+## A table for the report
+
+`report_table()` lays out a comparison in the format of Table 5 of
+@lee2026 and adds a note for the readers of the report. We make the table
+for the two outcomes.
+
+```{r table, results = "asis"}
+cat(report_table(outcomes, format = "markdown"))
+```
+
+The note under the table carries the scale and the estimand that we set
+for each outcome. Called with `comparison`, `report_table()` makes the
+table for all five analyses, and with `format = "latex"` it writes the
+table as LaTeX code with the rules of the booktabs package.
+
+## References

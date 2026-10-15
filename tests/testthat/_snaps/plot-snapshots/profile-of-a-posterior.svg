@@ -1,0 +1,80 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' data-engine-version='2.0' width='720.00pt' height='576.00pt' viewBox='0 0 720.00 576.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: #FFFFFF;'/>
+<defs>
+  <clipPath id='cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA='>
+    <rect x='0.00' y='0.00' width='720.00' height='576.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<rect x='0.00' y='0.00' width='720.00' height='576.00' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
+</g>
+<defs>
+  <clipPath id='cpNDAuMTN8NzE0LjUyfDIyLjc4fDQ4NS40OQ=='>
+    <rect x='40.13' y='22.78' width='674.39' height='462.71' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpNDAuMTN8NzE0LjUyfDIyLjc4fDQ4NS40OQ==)'>
+<polyline points='40.13,464.46 714.52,464.46 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,364.31 714.52,364.31 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,264.15 714.52,264.15 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,164.00 714.52,164.00 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,63.85 714.52,63.85 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<rect x='40.13' y='165.93' width='674.39' height='298.37' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #0072B2; fill-opacity: 0.10;' />
+<line x1='40.13' y1='374.20' x2='714.52' y2='374.20' style='stroke-width: 1.49; stroke: #0072B2; stroke-linecap: butt;' />
+<line x1='40.13' y1='372.43' x2='714.52' y2='372.43' style='stroke-width: 1.49; stroke: #D55E00; stroke-dasharray: 3.98,3.98; stroke-linecap: butt;' />
+<line x1='70.79' y1='464.39' x2='70.79' y2='235.84' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='158.37' y1='464.37' x2='158.37' y2='213.20' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='245.95' y1='464.35' x2='245.95' y2='201.32' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='333.54' y1='464.26' x2='333.54' y2='151.72' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='421.12' y1='464.26' x2='421.12' y2='151.72' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='508.70' y1='464.22' x2='508.70' y2='139.34' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='596.28' y1='464.22' x2='596.28' y2='139.34' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<line x1='683.87' y1='464.17' x2='683.87' y2='127.27' style='stroke-width: 1.07; stroke: #B3B3B3; stroke-linecap: butt;' />
+<circle cx='70.79' cy='409.27' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='158.37' cy='399.92' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='245.95' cy='394.38' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='333.54' cy='363.90' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='421.12' cy='363.90' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='508.70' cy='353.39' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='596.28' cy='353.39' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<circle cx='683.87' cy='341.28' r='2.06' style='stroke-width: 0.71; stroke: #404040; fill: #404040;' />
+<text x='42.43' y='31.88' style='font-size: 8.54px; fill: #333333; font-family: sans;' textLength='76.41px' lengthAdjust='spacingAndGlyphs'>V = 0.23   H = 0.014</text>
+<text x='44.99' y='42.12' style='font-size: 8.54px; fill: #333333; font-family: sans;' textLength='161.81px' lengthAdjust='spacingAndGlyphs'>mean reliability - I = 0.004   J_eff = 7.2 of 8</text>
+</g>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<text x='35.20' y='467.49' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.00</text>
+<text x='35.20' y='367.33' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.25</text>
+<text x='35.20' y='267.18' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.50</text>
+<text x='35.20' y='167.03' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.75</text>
+<text x='35.20' y='66.87' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>1.00</text>
+<text transform='translate(73.81,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>H</text>
+<text transform='translate(161.40,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>C</text>
+<text transform='translate(248.98,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>A</text>
+<text transform='translate(336.56,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.36px' lengthAdjust='spacingAndGlyphs'>D</text>
+<text transform='translate(424.15,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.38px' lengthAdjust='spacingAndGlyphs'>F</text>
+<text transform='translate(511.73,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>B</text>
+<text transform='translate(599.31,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='6.85px' lengthAdjust='spacingAndGlyphs'>G</text>
+<text transform='translate(686.89,490.42) rotate(-90)' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='5.87px' lengthAdjust='spacingAndGlyphs'>E</text>
+<text transform='translate(13.05,254.14) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: sans;' textLength='83.75px' lengthAdjust='spacingAndGlyphs'>Site reliability S_j</text>
+<line x1='290.95' y1='522.35' x2='304.77' y2='522.35' style='stroke-width: 1.49; stroke: #0072B2; stroke-linecap: butt;' />
+<line x1='385.71' y1='522.35' x2='399.54' y2='522.35' style='stroke-width: 1.49; stroke: #D55E00; stroke-dasharray: 3.98,3.98; stroke-linecap: butt;' />
+<text x='311.98' y='525.38' style='font-size: 8.80px; font-family: sans;' textLength='66.53px' lengthAdjust='spacingAndGlyphs'>informativeness I</text>
+<text x='406.74' y='525.38' style='font-size: 8.80px; font-family: sans;' textLength='58.69px' lengthAdjust='spacingAndGlyphs'>mean reliability</text>
+<text x='40.13' y='14.56' style='font-size: 13.20px; font-family: sans;' textLength='116.66px' lengthAdjust='spacingAndGlyphs'>profile of a posterior</text>
+<text x='5.48' y='548.38' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='378.36px' lengthAdjust='spacingAndGlyphs'>Points are the posterior means of the site reliabilities. Bars are their 95% posterior intervals;</text>
+<text x='5.48' y='558.48' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='360.69px' lengthAdjust='spacingAndGlyphs'>the band is that of I. Lines: informativeness I (solid), mean reliability (dashed). Posterior</text>
+<text x='5.48' y='568.58' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='230.26px' lengthAdjust='spacingAndGlyphs'>summaries, conditional on the supplied standard errors.</text>
+</g>
+</svg>

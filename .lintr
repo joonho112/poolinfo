@@ -1,0 +1,26 @@
+linters: linters_with_defaults(
+  line_length_linter = line_length_linter(120),
+  # The printing and the plot functions are long lists of independent
+  # lines and layers; each step counts as a branch.
+  cyclocomp_linter = cyclocomp_linter(30),
+  # Names keep the notation of the paper: J sites, the reliabilities S, the
+  # informativeness I, the dispersion H, the logit variance V, the
+  # concentration count J_eff, the geometric and harmonic means GM and HM,
+  # and the design matrix X. Constants are in upper case.
+  object_name_linter = object_name_linter(
+    styles = c("snake_case", "dotted.case"),
+    regexes = c(
+      "^(J|N|I|H|V|S|W|X|A|B|Q|R|K)$",
+      "(^|_)(J|I|H|V|S|W|X|GM|HM|AM|CV|MC|MCSE|ESS)(_|$)",
+      "^\\.[A-Z][A-Z0-9_]+$",
+      "^\\.Random\\.seed$"
+    )
+  ),
+  object_length_linter = object_length_linter(40),
+  T_and_F_symbol_linter = T_and_F_symbol_linter(),
+  object_usage_linter = NULL
+  )
+exclusions: list(
+  "tests/testthat.R",
+  "tests/testthat/*.R" = list(object_name_linter = Inf)
+  )

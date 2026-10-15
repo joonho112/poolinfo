@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' data-engine-version='2.0' width='720.00pt' height='576.00pt' viewBox='0 0 720.00 576.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: #FFFFFF;'/>
+<defs>
+  <clipPath id='cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA='>
+    <rect x='0.00' y='0.00' width='720.00' height='576.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<rect x='0.00' y='0.00' width='720.00' height='576.00' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
+</g>
+<defs>
+  <clipPath id='cpNDAuMTN8NzE0LjUyfDIyLjc4fDUxMS4wNg=='>
+    <rect x='40.13' y='22.78' width='674.39' height='488.28' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpNDAuMTN8NzE0LjUyfDIyLjc4fDUxMS4wNg==)'>
+<polyline points='40.13,488.87 714.52,488.87 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,377.89 714.52,377.89 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,266.92 714.52,266.92 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,155.95 714.52,155.95 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='40.13,44.98 714.52,44.98 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='70.79,511.06 70.79,22.78 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='224.06,511.06 224.06,22.78 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='377.33,511.06 377.33,22.78 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='530.60,511.06 530.60,22.78 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<polyline points='683.87,511.06 683.87,22.78 ' style='stroke-width: 1.07; stroke: #EBEBEB; stroke-linecap: butt;' />
+<line x1='-634.25' y1='999.34' x2='1388.91' y2='-465.49' style='stroke-width: 1.07; stroke: #BFBFBF; stroke-linecap: butt;' />
+<polyline points='70.79,488.87 147.42,488.87 147.42,414.14 224.06,414.14 224.06,346.51 300.69,346.51 300.69,278.89 377.33,278.89 377.33,217.69 453.96,217.69 453.96,156.49 530.60,156.49 530.60,114.87 607.23,114.87 607.23,76.88 683.87,76.88 683.87,44.98 ' style='stroke-width: 1.71; stroke: #009E73; stroke-linecap: butt;' />
+<text x='346.67' y='358.74' style='font-size: 8.82px; fill: #009E73; font-family: sans;' textLength='58.61px' lengthAdjust='spacingAndGlyphs'>J_eff = 7.5 of 8</text>
+<text x='148.48' y='420.72' style='font-size: 7.97px; fill: #009E73; font-family: sans;' textLength='5.32px' lengthAdjust='spacingAndGlyphs'>E</text>
+<text x='225.12' y='353.09' style='font-size: 7.97px; fill: #009E73; font-family: sans;' textLength='5.32px' lengthAdjust='spacingAndGlyphs'>B</text>
+<text x='301.93' y='285.47' style='font-size: 7.97px; fill: #009E73; font-family: sans;' textLength='6.20px' lengthAdjust='spacingAndGlyphs'>G</text>
+</g>
+<g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
+<text x='35.20' y='491.89' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.00</text>
+<text x='35.20' y='380.92' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.25</text>
+<text x='35.20' y='269.95' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.50</text>
+<text x='35.20' y='158.98' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.75</text>
+<text x='35.20' y='48.01' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>1.00</text>
+<text x='70.79' y='522.05' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.00</text>
+<text x='224.06' y='522.05' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.25</text>
+<text x='377.33' y='522.05' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.50</text>
+<text x='530.60' y='522.05' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>0.75</text>
+<text x='683.87' y='522.05' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: sans;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>1.00</text>
+<text x='377.33' y='534.19' text-anchor='middle' style='font-size: 11.00px; font-family: sans;' textLength='166.90px' lengthAdjust='spacingAndGlyphs'>Fraction of sites, most reliable first</text>
+<text transform='translate(13.05,266.92) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: sans;' textLength='184.04px' lengthAdjust='spacingAndGlyphs'>Cumulative proportion of the reliability</text>
+<text x='40.13' y='14.56' style='font-size: 13.20px; font-family: sans;' textLength='79.26px' lengthAdjust='spacingAndGlyphs'>concentration</text>
+<text x='5.48' y='548.38' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='387.76px' lengthAdjust='spacingAndGlyphs'>Each step adds the proportion S_j / sum(S_k) of the next most reliable site. The concentration</text>
+<text x='5.48' y='558.48' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='402.33px' lengthAdjust='spacingAndGlyphs'>count J_eff is the inverse of the sum of the squared proportions. On the diagonal every site would</text>
+<text x='5.48' y='568.58' style='font-size: 9.35px; fill: #4D4D4D; font-family: sans;' textLength='408.29px' lengthAdjust='spacingAndGlyphs'>have the same proportion. The labels name the 3 most reliable sites. At sigma_tau = 10 (supplied).</text>
+</g>
+</svg>

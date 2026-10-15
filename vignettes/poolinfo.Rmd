@@ -1,0 +1,412 @@
+---
+title: "Getting started with poolinfo"
+description: "Fit the posterior of a multisite trial's reliability profile, read the diagnostics and report them, with the course passing outcome of the Online Credit Recovery Study."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Getting started with poolinfo}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) knitr::opts_chunk$set(dev = "ragg_png")
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+pct <- function(x) round(100 * x)
+has_metafor <- requireNamespace("metafor", quietly = TRUE)
+```
+
+In a multisite trial each site gives an estimate of the intervention's
+effect, with a standard error. A hierarchical model shrinks each estimate
+toward the overall mean, a noisy site's estimate more than a precise
+one's. poolinfo summarizes this shrinkage across all the sites of a trial.
+The summaries are worth a look before you rank the sites, report their
+effects or study how the effect varies among them, because they say how
+much of each site's own estimate survives in the model's results, and
+they bear on which estimator suits such a goal [@lee2026]. In this
+vignette we analyze one outcome of a real trial, from the site estimates
+to the report.
+
+```{r library}
+library(poolinfo)
+```
+
+## The data
+
+The Online Credit Recovery Study randomized students who had failed
+Algebra 1 or English 9 in their first year of high school to one of two
+summer courses at their school, an online course or the school's usual
+teacher-directed course [@rickles2024]. The data set `ocrs` has one row
+for each of the `r nrow(ocrs)` school-by-subject sites in which students
+were assigned to both courses.
+
+```{r data}
+head(ocrs[, c("site", "subject", "n", "estimate", "se")])
+```
+
+```{r data-facts, include = FALSE}
+stopifnot(nrow(ocrs) == 32L, min(ocrs$n) == 24L, max(ocrs$n) == 104L)
+```
+
+Each `estimate` is the effect of assignment to the online course on
+passing the course, as a difference in proportions, and `se` is its
+standard error. A negative estimate means that, in that site, a smaller
+proportion of the students assigned to the online course passed. Within a
+site, the estimate comes from a regression of passing on the assignment
+indicator and the randomization blocks, so it weights the blocks
+differently from a comparison of all the site's students. `?ocrs` gives
+the details, and `vignette("multisite-trial")` compares this contrast with
+other first-stage analyses.
+
+## Fitting the posterior
+
+`reliability_posterior()` takes the estimates and their standard errors.
+We also record the scale of the effects and the estimand at each site,
+which the printed output and the report sentences repeat.
+
+```{r fit}
+fit <- reliability_posterior(
+  estimate, se = se, site = site, data = ocrs,
+  scale_label = "risk difference",
+  target_label = "the block-adjusted intention-to-treat contrast for course passing"
+)
+fit
+```
+
+```{r fit-facts, include = FALSE}
+ps <- profile_summary(fit)
+val <- function(q, col = "mean") ps[[col]][ps$quantity == q]
+v <- ocrs$se^2
+gm_se <- sqrt(exp(mean(log(v))))
+ratio <- val("sigma_tau")^2 / gm_se^2
+V <- val("V")
+factor_se <- exp(sqrt(V) / 2)
+lead_H <- val("I") * (1 - val("I")) * V / 2
+lead_gap <- lead_H * (1 - 2 * val("I"))
+gap <- plugin_gap(fit)
+pairs <- sum(table(ocrs$school) == 2L)
+stopifnot(
+  all(fit$checks$status == "ok"),
+  val("I", "lower") < 0.5, prob_above(fit) > 0.95,
+  ratio > 1.8, ratio < 2.5,
+  abs(lead_H - val("H")) < 0.002,
+  sign(lead_gap) == sign(val("mean") - val("I")),
+  val("mean") < val("I"), val("I") - val("mean") < 0.01,
+  val("J_eff") > 31,
+  all(gap$difference[1:2] > 0),
+  val("effect_mean", "upper") < 0,
+  abs(V - mean((log(v) - mean(log(v)))^2)) < 1e-12,
+  pairs == 8L
+)
+if (has_metafor) {
+  reml <- metafor::rma(estimate, sei = se, data = ocrs, method = "REML")
+  I_reml <- reliability_profile(reml)$stats[["I"]]
+  stopifnot(I_reml < val("I"), reml$I2 > 60, reml$I2 < 75)
+}
+```
+
+We use flat priors on the mean and on the between-site standard
+deviation $\sigma_\tau$, as @lee2026 does, and the posterior comes from
+numerical integration over $\sigma_\tau$ in a fraction of a second. See
+`vignette("posterior-summaries")` for other priors and how much they
+matter. The last two lines of the header state an assumption and a
+definition. The model treats the standard errors as exact, although they
+are estimates too, so the posterior intervals leave out the uncertainty
+in the standard errors themselves, and a different first-stage analysis
+of the same trial could give different diagnostics. And each site counts
+equally in the diagnostics, whatever its size, so a site of
+`r min(ocrs$n)` students weighs as much as one of `r max(ocrs$n)`.
+
+## Site reliabilities
+
+Write $\hat\tau_j$ for site $j$'s estimate and $v_j$ for its sampling
+variance, the squared standard error. Given $\sigma_\tau$ and the mean
+$\mu$ of the effects, the posterior mean of site $j$'s effect is
+
+$$
+S_j \hat\tau_j + (1 - S_j)\mu, \qquad
+S_j = \frac{\sigma_\tau^2}{\sigma_\tau^2 + v_j}.
+$$
+
+$S_j$ is the weight that the normal model puts on the site's own
+estimate, and it is also the reliability of the site's estimate, the
+proportion of the estimate's variance that comes from the true effects. We call the reliabilities
+$S_1, \dots, S_J$ together the trial's reliability profile. @lee2026
+writes $\sigma^2$ and $\tau$ for what this package calls $\sigma_\tau^2$
+and $\mu$.
+
+## The informativeness
+
+The first summary of the profile is the *informativeness*,
+
+$$
+I = \frac{\sigma_\tau^2}{\sigma_\tau^2 + \mathrm{GM}(v)},
+$$
+
+the reliability of a site whose sampling variance is the geometric mean
+$\mathrm{GM}(v)$ of the $v_j$. It is also the mean of the reliabilities on
+the logit scale [@lee2026], and @lee2025 use it to organize comparisons of
+prior models and posterior summaries for site effects.
+
+For course passing, the posterior mean of $I$ is `r num(val("I"))`, with a
+95% posterior interval from `r num(val("I", "lower"))` to
+`r num(val("I", "upper"))`. The geometric mean of the `r nrow(ocrs)`
+standard errors is `r num(gm_se, 3)`, and the posterior mean of
+$\sigma_\tau$ is `r num(val("sigma_tau"))`, so $\sigma_\tau^2$ is about
+`r num(ratio, 1)` times $\mathrm{GM}(v)$. A site with the geometric-mean
+standard error keeps about `r pct(val("I"))`% of its own estimate, which means that
+the model moves its posterior mean about `r pct(1 - val("I"))`% of the way
+toward the mean effect. The posterior probability that $I$ exceeds 1/2 is
+`r num(prob_above(fit))`. At $I = 1/2$, $\sigma_\tau^2$ equals
+$\mathrm{GM}(v)$ and a site with the geometric-mean standard error is
+pulled halfway.
+
+Meta-analysts will recognize the form of the $I^2$ statistic
+[@higgins2002], which puts the "typical" sampling variance where $I$ puts
+the geometric mean. `r if (has_metafor) sprintf("For these estimates, metafor's REML fit gives an $I^2$ of %s%%, and its estimate of $\\sigma_\\tau$, %s, is a little below the posterior mean.", round(reml$I2), num(sqrt(reml$tau2), 3))`
+
+## How unequal the reliabilities are
+
+The other three summaries describe how the reliabilities differ from site
+to site, and all three depend on the logit variance $V$, the variance of
+the logits of the reliabilities (with divisor $J$). Because
+$\mathrm{logit}\, S_j = \log\sigma_\tau^2 - \log v_j$, $V$ is also the
+variance of $\log v_j$, so the standard errors fix it. Here $V = `r num(V)`$, so the standard errors are typically within a
+factor of `r num(factor_se)` of their geometric mean, although they range
+from `r num(min(ocrs$se), 3)` to `r num(max(ocrs$se), 3)`.
+
+The *mean reliability* $\bar S$ is the ordinary average of the $S_j$.
+With $\sigma_\tau$ and $\mu$ known, the average posterior variance of the
+site effects is $\sigma_\tau^2(1 - \bar S)$. In a trial whose sites all
+had the geometric-mean standard error, every $S_j$ would equal $I$, so
+$\bar S > I$ exactly when the site effects are estimated more precisely,
+on average, than in that trial of equal precision. For passing, $\bar S$
+is `r num(val("mean"))`, a little below $I$.
+
+The *dispersion* $H$ measures how far the reliabilities are from one
+another. Treat each $S_j$ as the success probability of a Bernoulli
+distribution, a device for measuring how far apart reliabilities are
+rather than a model for the data. Among constant values $p$, the average
+Kullback-Leibler divergence
+$J^{-1}\sum_j \mathrm{KL}\{\mathrm{Ber}(p) \,\|\, \mathrm{Ber}(S_j)\}$ is
+smallest at $p = I$, and $H$ is that smallest value. It is 0 only when all
+the reliabilities are equal. When they are close to one another, the
+leading terms in $V$ are
+
+$$
+H \approx \tfrac12 I(1 - I)V, \qquad
+\bar S - I \approx \tfrac12 I(1 - I)(1 - 2I)V.
+$$
+
+The mean reliability is therefore usually below $I$ when $I > 1/2$ and
+above it when $I < 1/2$, but a skewed profile, or a value of $I$ near 1/2,
+can reverse the sign. `vignette("reliability-profiles")` shows when. For
+passing, the leading term of $H$ at the posterior mean of $I$ is
+`r num(lead_H, 3)`, close to $H$'s posterior mean of `r num(val("H"), 3)`.
+
+The *concentration count*
+
+$$
+J_{\mathrm{eff}} = \frac{(\sum_j S_j)^2}{\sum_j S_j^2}
+$$
+
+describes how the total reliability $\sum_j S_j$ is shared among the
+sites. It equals $J$ when every site has the same reliability, whatever
+that reliability is, and it approaches 1 as one site comes to carry nearly
+all of it. Its formula is Kish's, with the reliabilities as weights, but
+it is not a sample size. It measures only how evenly the total is shared,
+so sites that all have a reliability of 0.1 give $J$, and so do sites
+that all have 0.9. For passing it is `r num(val("J_eff"), 1)` of
+`r nrow(ocrs)`, so the total is shared almost evenly.
+
+## The posterior in more detail
+
+`summary()` adds the posterior standard deviations and medians, the
+posterior of $\sigma_\tau$ and of the mean, and each diagnostic's value at
+the posterior mean of $\sigma_\tau^2$.
+
+```{r summary}
+summary(fit)
+```
+
+The first block also gives the harmonic centroid, the harmonic mean of
+the $S_j$, which equals $\sigma_\tau^2/(\sigma_\tau^2 + \bar v)$ with
+$\bar v$ the arithmetic mean of the $v_j$, so it is never above $I$ or
+$\bar S$. To use the numbers in your own code, `profile_summary()` returns
+them as a data frame, one row per quantity.
+
+```{r profile-summary}
+print(profile_summary(fit), digits = 3)
+```
+
+```{r harmonic-facts, include = FALSE}
+hm <- val("harmonic")
+stopifnot(hm < val("mean"), hm < val("I"),
+          abs(1 / mean(1 / site_reliability(se = ocrs$se, sigma_tau = 0.2)) -
+                0.04 / (0.04 + mean(ocrs$se^2))) < 1e-12)
+```
+
+The mean effect has posterior mean
+`r num(100 * val("effect_mean"), 1)` percentage points, with a 95%
+posterior interval from `r num(100 * val("effect_mean", "lower"), 1)` to
+`r num(100 * val("effect_mean", "upper"), 1)`. It is the mean of the
+distribution of site effects, a mean over sites rather than students, so
+it is not the effect for the average student. Because its interval lies
+below 0, we conclude that assignment to the online course lowered passing
+in the average site.
+
+In the last block we compare each posterior mean with the diagnostic's
+value at the posterior mean of $\sigma_\tau^2$, the number that a plug-in
+of that estimate would report. $I$ and every $S_j$ are concave functions of
+$\sigma_\tau^2$, so $I$ and $\bar S$ at the posterior mean of
+$\sigma_\tau^2$ are never below their posterior means [@lee2026,
+Proposition 3]. Here $I$ is `r num(gap$at_mean_sigma2[1], 3)` against
+`r num(gap$posterior_mean[1], 3)`. $H$ and $J_{\mathrm{eff}}$ have no
+such order. `r if (has_metafor) sprintf("A plug-in of another estimate of $\\sigma_\\tau$ can fall on either side of the posterior mean: at metafor's REML estimate, $I$ is %s.", num(I_reml, 3))`
+
+## Plots
+
+`plot()` shows four panels: the estimates beside the posterior means of
+the site effects, the sorted reliabilities, the posterior density of $I$,
+and the analysis's position in the plane of $I$ and $V$. We multiply the
+effects by 100 to show them in percentage points.
+
+```{r dashboard, fig.width = 10, fig.height = 9, out.width = "100%", fig.alt = "Four panels: the site estimates and their posterior means with intervals; the sorted site reliabilities with the informativeness and its band; the posterior density of the informativeness; and the informativeness and logit variance plane."}
+plot(fit, scale = 100)
+```
+
+In panel (a) we see the posterior means pulled toward the mean effect,
+most visibly for the sites with wide intervals. Panel (b) shows the reliability
+profile, from `r num(min(site_table(fit)$reliability))` to
+`r num(max(site_table(fit)$reliability))`. In panel (d) the point lies
+right of 1/2, where the leading term of $\bar S - I$ is negative, and
+between the contours at 0.02 and 0.03 of $H$'s leading term. The plot is
+a patchwork of ggplot objects. To change one panel, call its own function
+(`plot_pooling()`, `plot_profile()`, `plot_functionals()` or
+`plot_plane()`), which returns a ggplot object with a fuller caption.
+
+## The sites
+
+`site_table()` gives the numbers behind panels (a) and (b), one row per
+site. We show the three sites with the largest standard errors and the
+three with the smallest, in percentage points:
+
+```{r sites}
+sites <- site_table(fit)
+sites <- sites[order(sites$se, decreasing = TRUE),
+               c("site", "estimate", "se", "reliability", "effect")]
+shown <- rbind(head(sites, 3), tail(sites, 3))
+points <- c("estimate", "se", "effect")
+shown[points] <- round(100 * shown[points], 1)
+shown$reliability <- round(shown$reliability, 2)
+shown
+```
+
+```{r site-facts, include = FALSE}
+mu <- val("effect_mean")
+move <- abs(sites$effect - sites$estimate) / abs(sites$estimate - mu)
+stopifnot(max(abs(move - (1 - sites$reliability))) < 0.02,
+          identical(sites$site[1:2], c("S24", "S14")))
+```
+
+Each posterior mean moves toward the mean effect by about $1 - S_j$ of the
+distance between the site's estimate and the mean. A noisy site moves a
+larger part of the way, but it moves far only if its estimate is far from
+the mean. Site S24, with the largest standard error, moves
+`r pct(1 - sites$reliability[1])`% of the way, from
+`r num(100 * sites$estimate[1], 1)` to `r num(100 * sites$effect[1], 1)`
+points. Site S14 is nearly as noisy and moves
+`r pct(1 - sites$reliability[2])`% of the way, yet its estimate is close
+to the mean, so its posterior mean changes by only
+`r num(100 * abs(sites$effect[2] - sites$estimate[2]), 1)` points.
+
+## Your own data
+
+The same call works for any estimates with standard errors. You can give
+
+- plain vectors, `reliability_posterior(y, se = s)`, or sampling variances
+  with `se2`, such as the `vi` column that `metafor::escalc()` computes;
+- a random-effects fit of metafor, `reliability_posterior(rma_fit)`, whose
+  moderators become the mean model; `reliability_profile(rma_fit)` gives
+  the profile at its REML estimate, and `vignette("meta-analysis")` works
+  through an example;
+- site covariates for the mean, `mean_model = ~ x`, so that each site is
+  shrunk toward its predicted value;
+- posterior draws of $\sigma_\tau$ from other software, to
+  `reliability_draws()`, which also reads a brms fit of the form
+  `y | se(sei) ~ 1 + (1 | site)` directly.
+
+The model treats the sites as independent. In this trial `r pairs`
+schools have a site in each subject, and some students appear in both.
+We check how much that matters in `vignette("multisite-trial")`.
+
+The model also gives every site the same mean and variance of the
+effects, whatever its precision. When the smaller sites tend to have
+larger effects, say, that common mean and variance can be inadequate
+[@lee2026, Section 9]. A plot of the estimates against their standard
+errors is a first check, although both are noisy:
+
+```{r estimate-precision, fig.height = 4, fig.alt = "The 32 site estimates for course passing plotted against their standard errors; the points show no trend."}
+ggplot2::ggplot(ocrs, ggplot2::aes(x = se, y = estimate)) +
+  ggplot2::geom_point() +
+  ggplot2::labs(x = "Standard error", y = "Site estimate") +
+  ggplot2::theme_minimal()
+```
+
+```{r precision-facts, include = FALSE}
+r_se <- stats::cor(ocrs$estimate, ocrs$se)
+stopifnot(abs(r_se) < 0.2)
+```
+
+In this trial the estimates show no trend with their standard errors (a
+correlation of `r num(r_se)`). A trend would call for a covariate in the
+mean model that carries it, or for a model in which the variance of the
+effects depends on precision, which poolinfo does not fit.
+
+## Reporting
+
+@lee2026 recommends that a report
+
+1. state the estimand at each site, its scale, the estimator and the
+   standard errors;
+2. give $I$ and $\bar S$ together, with $H$ or $V$;
+3. add $J_{\mathrm{eff}}$ when the concentration of the reliability
+   matters.
+
+`report_text()` writes the numbers as sentences, with the labels and the
+conditioning on the standard errors. A report still needs to define the
+four quantities and cite the paper.
+
+```{r report}
+writeLines(strwrap(report_text(fit, outcome = "course passing")))
+```
+
+`report_table()` gives the main numbers as a table, either as a data frame
+or as markdown or LaTeX text. In an R Markdown document, a chunk with the
+option `results = "asis"` turns the markdown into a table:
+
+```{r report-table, results = "asis"}
+cat(report_table(fit, format = "markdown"))
+```
+
+## Other vignettes
+
+- `vignette("multisite-trial")` adds the study's second outcome, credits
+  earned by the fourth year, whose diagnostics differ sharply from those
+  of passing, and shows how much the scale of the effects matters.
+- `vignette("reliability-profiles")` works through the geometry behind
+  $I$, $H$ and $J_{\mathrm{eff}}$.
+- `vignette("posterior-summaries")` covers the choice of prior, posterior
+  draws from other software and the numerical checks.
+- `vignette("meta-analysis")` and `vignette("small-area-estimation")`
+  apply the diagnostics to a meta-analysis and to an area-level model.
+- `vignette("planning")` uses them to plan a trial.
+- `vignette("implementation")` documents the computation.
+
+## References

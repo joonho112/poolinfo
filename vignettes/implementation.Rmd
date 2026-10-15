@@ -1,0 +1,655 @@
+---
+title: "Computation and reproducibility"
+description: "How poolinfo computes its posterior summaries and how accurate they are: the posterior of the between-site standard deviation, the quadrature rule and its checks, the adaptive engine, the tolerances of the tests, the reproduction of the paper's numbers, the derivations beyond the paper, and the paper's notation."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Computation and reproducibility}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+sci <- function(x) formatC(x, format = "e", digits = 1)
+# An upper bound in the text, rounded up so that it stays true.
+sci_up <- function(x) {
+  e <- floor(log10(x))
+  formatC(ceiling(x / 10^e * 10 - 1e-9) / 10 * 10^e, format = "e", digits = 1)
+}
+# A number as the paper prints it, without the zero before the point.
+as_printed <- function(x, digits = 2) {
+  sub("^(-?)0[.]", "\\1.", formatC(x, format = "f", digits = digits))
+}
+has_metafor <- requireNamespace("metafor", quietly = TRUE)
+```
+
+In this vignette we describe how poolinfo computes its posterior summaries
+and what evidence there is that they are accurate. We begin with the
+marginal posterior of the between-site standard deviation and the conditions
+under which its moments exist, then describe the default quadrature rule and
+the checks that come with every fit. Next come the second engine and how
+the two engines compare, the tests' tolerances, and our
+reproduction of the numbers in @lee2026. We end with the derivations behind
+the parts of the package that go beyond the paper, and a table that maps the
+paper's notation to the package's.
+
+```{r library}
+library(poolinfo)
+```
+
+## Integrating out the mean
+
+Collect the site estimates $\hat\tau_1, \dots, \hat\tau_J$ in a vector $y$,
+and let $X$ be the $J \times p$ design matrix of the mean model, with rows
+$x_j^\top$. For a common mean it is a column of ones, and $p = 1$. Site
+effects are normal around $x_j^\top\beta$ with standard deviation
+$\sigma_\tau$, and the estimates are normal around the effects with known
+variances $v_j$. Write $w_j = 1/(\sigma_\tau^2 + v_j)$ and
+$W = \mathrm{diag}(w_1, \dots, w_J)$, let $b = (X^\top W X)^{-1} X^\top W y$
+be the weighted least-squares fit, and let $Q = (y - Xb)^\top W (y - Xb)$ be
+its weighted residual sum of squares. Under a flat prior on $\beta$,
+integrating $\beta$ out of the likelihood leaves the posterior density of
+$\sigma_\tau$, up to a constant,
+
+$$
+g(\sigma_\tau) = \pi(\sigma_\tau)\, |X^\top W X|^{-1/2}
+\prod_j (\sigma_\tau^2 + v_j)^{-1/2} \exp(-Q/2),
+$$
+
+where $\pi$ is the prior density of $\sigma_\tau$. Apart from $\pi$, $g$ is
+the restricted likelihood of a random-effects meta-regression at
+$\tau^2 = \sigma_\tau^2$ in metafor's notation [@harville1974; @viechtbauer2010]. Under the
+flat prior on $\sigma_\tau$, then, the posterior density of $\sigma_\tau$
+peaks at the REML estimate of $\sigma_\tau$. For a common mean,
+$X^\top W X = \sum_j w_j$, $b$ is the precision-weighted mean, and $g$ is
+equation (D.2) of @lee2026. Every diagnostic is a function of $\sigma_\tau$
+and the $v_j$ alone, so each of its posterior summaries is a one-dimensional
+integral against $g$.
+
+## Tails and moments
+
+For every $\sigma_\tau \ge B > 0$ we have three bounds, where $v_{\max}$ is
+the largest $v_j$:
+
+- $\exp(-Q/2) \le 1$,
+- $\prod_j (\sigma_\tau^2 + v_j)^{-1/2} \le \sigma_\tau^{-J}$, and
+- $X^\top W X \ge X^\top X / (\sigma_\tau^2 + v_{\max})$ in the matrix
+  order.
+
+Together they give
+
+$$
+g(\sigma_\tau) \le |X^\top X|^{-1/2} (1 + v_{\max}/B^2)^{p/2}\,
+\sigma_\tau^{p - J}\, \pi(\sigma_\tau), \qquad \sigma_\tau \ge B,
+$$
+
+which for $p = 1$ is the tail bound of Appendix D.3 of the paper. In the
+limit the bound is sharp. As $\sigma_\tau$ grows, $Q$ tends to 0 and the
+ratio of $g(\sigma_\tau)$ to $\sigma_\tau^{p - J} \pi(\sigma_\tau)$ tends to
+$|X^\top X|^{-1/2}$, so the tail of $g$ is that of
+$\sigma_\tau^{p - J} \pi(\sigma_\tau)$.
+
+Suppose the prior density falls off like $\sigma_\tau^{-k}$, with $k = 0$
+for the flat prior, $k = \nu + 1$ for a half-t prior with $\nu$ degrees of
+freedom and $k = 2$ for the half-Cauchy. Then the posterior mean of
+$\sigma_\tau^q$ is finite exactly when $J > q + p + 1 - k$, and the case
+$q = 0$ is the condition for a proper posterior. Under the half-normal and
+uniform priors every moment exists. A flat prior thus needs $J \ge p + 2$
+sites. A proper prior gives a proper posterior with as few as $p$ sites.
+With $J = p$, however, the fitted values reproduce the estimates whatever
+$\sigma_\tau$ is, $g$ is a constant times $\pi$, and the posterior is the
+prior. For that reason the package asks for at least $p + 1$ sites under a
+proper prior. It integrates only the moments that exist and reports the
+others as not defined. A posterior mean of a mean-model coefficient
+requires the first absolute moment of its marginal distribution. Since its
+conditional standard deviation grows proportionally to $\sigma_\tau$, this
+requires $E(\sigma_\tau)$ to exist: at least $p + 3$ sites under the flat
+prior. Its standard deviation requires $E(\sigma_\tau^2)$, hence $p + 4$
+sites. Central intervals remain available when these moments do not exist.
+
+The upper end $B$ of the integrals is doubled until the bound on the
+omitted tail of every moment that exists is within its limit, at most 400
+times. A moment that exists can still need a larger $B$ than that when its
+tail falls off very slowly: the mean of $\sigma_\tau$ with 2 sites and a
+half-t prior with 0.05 degrees of freedom has a tail bound that falls like
+$B^{-0.05}$. Both engines then stop with an error that names the moment.
+A prior with a lighter tail avoids it.
+
+## Quadrature on panels
+
+The default engine, `posterior_control(engine = "nodes")`, builds one
+quadrature rule in $\sigma_\tau$ for each fit and uses it for every summary
+of the fit. Above a lower end $\sigma_{\mathrm{lo}}$ the rule is composite
+Gauss-Legendre quadrature on $t = \log\sigma_\tau$, with the Jacobian
+$d\sigma_\tau = \sigma_\tau\,dt$ in its weights. At the start no panel is
+wider than 0.5 on the log scale. We halve a panel until its 16-point and
+32-point rules agree, for the posterior mass and for the second moment when
+it exists. They agree when they differ by less than $10^{-14}$ of the total
+or $64J\epsilon$ of the panel's own integral, whichever is larger, where
+$\epsilon$ is the machine epsilon. Below the second limit, the rounding
+error of $\log g$, a sum of $J$ terms, no amount of halving brings the two
+rules closer. Each panel of the final rule has 32 nodes.
+
+Below $\sigma_{\mathrm{lo}}$ the rule is a single 32-point Gauss-Legendre
+panel in $\sigma_\tau$ itself. Panels on the log scale cannot reach 0, yet
+under every prior of `sd_prior()` the posterior density of $\sigma_\tau$ is
+positive there, and roughly $g(0)\,\sigma_{\mathrm{lo}}$ of the
+unnormalized mass lies between 0 and $\sigma_{\mathrm{lo}}$. We set
+$\sigma_{\mathrm{lo}}$ to $e^{-8}$ times the smallest standard error, or
+times the scale of a proper prior or the upper limit of a uniform prior if
+that is smaller. Below it $\sigma_\tau^2$ is less than $e^{-16}$ times every
+$v_j$, and neither the likelihood nor the prior changes much.
+
+Under a uniform prior the upper end $B$ is the prior's upper limit.
+Otherwise $B$ starts well beyond the spread of the estimates and the
+standard errors, and is doubled until the bounds of the previous section,
+divided by the mass below $B$, meet two limits. The bound on the mass must
+fall below $10^{-12}$, and the bound on $E(\sigma_\tau^q)$ below
+$10^{-10}\,\mathrm{GM}(v)^{q/2}$, for each of $q = 1, 2, 4$ whose moment
+exists. Dividing by the mass below $B$ rather than the whole makes the
+bounds conservative. With the factor $\mathrm{GM}(v)^{q/2}$ the limits
+change with the units of the estimates, so the rule does not depend on them.
+We compare the bounds with their limits on the log scale, where no power of
+$\sigma_\tau$ overflows. Within a panel, the distribution function is the
+integral of the Legendre series that matches the density at the panel's 32
+nodes, and the quantiles are its roots.
+
+We use the passing outcome of the credit recovery study as the example. Each
+fit stores its rule as `fit$rule`.
+
+```{r rule}
+fit <- reliability_posterior(estimate, se = se, data = ocrs)
+rule <- fit$rule
+data.frame(nodes = length(rule$sigma), panels = length(rule$edges) - 1,
+           sigma_lo = rule$sigma_lo, B = rule$upper)
+```
+
+```{r rule-facts, include = FALSE}
+n_panels <- length(rule$edges) - 1
+gm_se <- exp(mean(log(ocrs$se)))
+sigma_upper <- profile_summary(fit)$upper[profile_summary(fit)$quantity ==
+                                             "sigma_tau"]
+stopifnot(length(rule$sigma) == 32 * (n_panels + 1),
+          sum(rule$panel == 0) == 32,
+          abs(rule$sigma_lo - exp(-8) * min(ocrs$se)) < 1e-15)
+if (has_metafor) {
+  # The posterior density of sigma_tau peaks at the REML estimate.
+  dens <- functional_density(fit, "sigma_tau", n = 4001)
+  reml_ocrs <- metafor::rma(estimate, sei = se, data = ocrs, method = "REML")
+  step_grid <- diff(dens$value[1:2])
+  stopifnot(abs(dens$value[which.max(dens$density)] - sqrt(reml_ocrs$tau2)) <
+              2 * step_grid)
+}
+```
+
+The rule has `r length(rule$sigma)` nodes, 32 in each of the `r n_panels`
+panels above $\sigma_{\mathrm{lo}}$, here `r sci(rule$sigma_lo)`, and 32
+below it. Its upper end, $B = `r num(rule$upper)`$, is
+`r round(rule$upper / gm_se)` times
+$\sqrt{\mathrm{GM}(v)} = `r num(gm_se, 3)`$ and
+`r round(rule$upper / sigma_upper)` times the 97.5% quantile of
+$\sigma_\tau$.
+
+## Numerical checks
+
+Every fit carries checks of its integration, which `check_numerics()` lists.
+
+```{r checks}
+check_numerics(fit)[, c("check", "value", "limit", "status")]
+```
+
+```{r checks-facts, include = FALSE}
+ch <- check_numerics(fit)
+stopifnot(all(ch$status == "ok"), nrow(ch) == 9)
+```
+
+The first four rows compare the rule with two others. Halving every panel
+tests whether the panels are fine enough, and moving the lower end down to
+$\sigma_{\mathrm{lo}}/2$ tests the treatment of the mass near 0. Each
+compares the normalizing constants and the posterior means of $I$ and $H$,
+as relative differences, with the limit $10^{-10}$, or $64J\epsilon$ if that
+is larger. The next rows bound the mass beyond $B$ and, for the orders that
+exist, the part of $E(\sigma_\tau^q)$ beyond $B$, divided by
+$\sqrt{\mathrm{GM}(v)}^q$. The last row compares $H$'s turning point, on the
+logit scale, as found by two scans of different resolution. For this fit the
+largest relative difference between rules is `r sci(max(ch$value[1:4]))`,
+and the tail bounds are at most `r sci_up(max(ch$value[5:8]))`. Since $B$ is
+doubled only until the tail bounds pass, in other fits those rows can come
+close to their limits. A value outside its limit makes
+`reliability_posterior()` give a warning that points to `check_numerics()`.
+
+## The adaptive engine
+
+`posterior_control(engine = "adaptive")` computes each posterior mean,
+probability and quantile as a separate integral with `stats::integrate()`,
+as in the computation of @lee2026. On a finite range `integrate()` uses the
+adaptive Gauss-Kronrod routine of QUADPACK [@piessens1983], which starts
+from a single 21-point rule over the whole range. When the integrand is
+concentrated in a small part of a long range, that first rule can miss it,
+and `integrate()` returns 0 with an error estimate of 0:
+
+```{r integrate-miss}
+integrate(dnorm, 0, 1e4, mean = 60, sd = 0.5)
+```
+
+```{r integrate-facts, include = FALSE}
+stopifnot(integrate(dnorm, 0, 1e4, mean = 60, sd = 0.5)$value == 0,
+          abs(integrate(dnorm, 0, 100, mean = 60, sd = 0.5)$value - 1) < 1e-8)
+```
+
+Its true value is 1. Splitting the range so that the peak falls in a piece
+of moderate length avoids the failure. So the adaptive engine splits the
+range at $\sqrt{\mathrm{GM}(v)}$, as the paper did, and also at 9 points
+spread evenly on the log scale over the stretch where the density of
+$\log\sigma_\tau$ exceeds $e^{-70}$ times its largest value. Besides these
+extra splits, it differs from the paper's computation in two ways. Its
+integrals end at the node rule's upper end $B$, while the paper's run to
+infinity. And it takes the posterior standard deviations, and the intervals
+of the site effects and of the coefficients, from a node rule. Each
+integrand is scaled before it is integrated so that `integrate()`'s absolute
+tolerance acts as a relative one. For the eight schools, the tests check
+that multiplying the estimates and the standard errors by factors from
+$10^{-100}$ to $10^{100}$ changes the posterior means of the diagnostics by
+less than $10^{-9}$, relative, under both engines.
+
+The two engines use the same kernel $g$, the same upper end $B$ with the
+tail bounds that fix it, and the same formulas for the diagnostics. The
+adaptive engine also takes its standard deviations from a node rule. So
+their agreement checks the integration over $[0, B]$, by panels and
+Legendre series on one side and by adaptive subdivision on the other. The
+kernel and the formulas are checked against metafor's restricted
+likelihood, against brute-force integrals, and against reference values
+computed for @lee2026 with separate code that integrates to infinity. The
+node rule is the default because it is faster: a single rule serves every
+summary of a fit, while the adaptive engine integrates each summary, and
+each site, separately.
+
+## Tolerances
+
+Below are the tolerances of the tests, kept in
+`tests/testthat/helper-tolerances.R`. The first row is for identities of the
+profile algebra, which are true in exact arithmetic. The others govern two
+comparisons, with full-precision reference values computed for @lee2026 and
+between the two engines. In the fourth row, $x$ is the value being compared.
+
+| Quantity | Tolerance |
+|:---|:---|
+| identities of the profile algebra | $10^{-12}$ |
+| $I$, $\bar S$, $H$, $S_j$ and probabilities | $10^{-9}$, absolute |
+| $J_{\mathrm{eff}}$ | $10^{-9}$, relative |
+| $\sigma_\tau$, the mean effect, site means and standard deviations | $10^{-9}\max\{\sqrt{\mathrm{GM}(v)}, \lvert x\rvert\}$ |
+| $E(\sigma_\tau^2)$ and its quantiles | $10^{-8}$, relative |
+| $I$ at $E(\sigma_\tau^2)$ | $10^{-8}$, absolute |
+| normalizing constant | $10^{-10}$, relative |
+| turning point of $H$ (logit scale) | $10^{-7}$ |
+
+For $E(\sigma_\tau^2)$ the tolerance is looser, because the posterior tail
+of $\sigma_\tau^2$ is heavy. With 5 sites under the flat prior, its variance
+does not exist. Brute-force integrals are less accurate than either engine,
+and the tests that compare with them use looser tolerances:
+
+- $10^{-8}$ for posterior means under proper priors, and for the means and
+  standard deviations of the site effects
+- $10^{-7}$, relative, for $E(\sigma_\tau)$ when the prior's scale is far
+  below the standard errors
+- $10^{-6}$ for the conditional moments of the site effects under a mean
+  model, against a joint normal computation
+- $10^{-4}$ for the kernel of a mean model, against a two-dimensional
+  integral over $\beta$
+
+## Reproducing the paper
+
+The data set `ocrs` has the inputs of the credit recovery study's 6 analyses
+in @lee2026. They are course passing in all 32 sites, in the 13 Algebra 1
+sites and in the 19 English 9 sites, passing with covariates, credits
+earned, and passing as a log odds ratio. The first five are the rows of the
+paper's Table 5 and Table G.1, and the last is the log-odds row of Table
+G.2. We fit each with both engines.
+
+```{r analyses}
+algebra <- ocrs$subject == "Algebra 1"
+analyses <- list(
+  Pooled = fit,
+  `Algebra 1` = reliability_posterior(estimate, se = se,
+                                      data = ocrs[algebra, ]),
+  `English 9` = reliability_posterior(estimate, se = se,
+                                      data = ocrs[!algebra, ]),
+  Adjusted = reliability_posterior(estimate_adjusted, se = se_adjusted,
+                                   data = ocrs),
+  Credits = reliability_posterior(estimate_credits, se = se_credits,
+                                  data = ocrs),
+  `Log odds` = reliability_posterior(log_odds_ratio, se = se_log_odds_ratio,
+                                     data = ocrs)
+)
+adaptive <- lapply(analyses, update,
+                   control = posterior_control(engine = "adaptive"))
+```
+
+We tabulate the node rule's posterior means and interval ends to four
+decimals.
+
+```{r paper-table}
+tab <- as.data.frame(compare_profiles(.list = analyses))
+cols <- c("I", "I_lower", "I_upper", "mean", "H", "H_lower", "H_upper",
+          "J_eff")
+cbind(tab["analysis"], round(tab[cols], 4))
+```
+
+```{r paper-facts, include = FALSE}
+stopifnot(length(analyses) == 6,
+          identical(as.integer(tab$J), c(32L, 13L, 19L, 32L, 32L, 32L)))
+# The values that the paper's Table 5 prints.
+table5 <- list(
+  I = c(.67, .63, .71, .65, .32), I_lower = c(.50, .29, .49, .47, .02),
+  I_upper = c(.81, .87, .87, .80, .60), mean = c(.66, .63, .70, .64, .33),
+  H = c(.025, .016, .028, .028, .028),
+  H_lower = c(.019, .009, .018, .021, .003),
+  H_upper = c(.029, .020, .034, .032, .038),
+  J_eff = c(31.2, 12.7, 18.5, 31.0, 28.8)
+)
+digits5 <- c(I = 2, I_lower = 2, I_upper = 2, mean = 2, H = 3, H_lower = 3,
+             H_upper = 3, J_eff = 1)
+for (col in names(table5)) {
+  stopifnot(isTRUE(all.equal(round(tab[[col]][1:5], digits5[[col]]),
+                             table5[[col]])))
+}
+# Table G.1: the mean effect, sigma_tau with its interval, I at
+# E(sigma_tau^2), Pr(I > 1/2) and V; and the log-odds row of Table G.2.
+g1 <- t(vapply(analyses[1:5], function(f) {
+  s <- profile_summary(f)
+  at <- function(q, col) s[[col]][s$quantity == q]
+  c(at("effect_mean", "mean"), at("sigma_tau", "mean"),
+    at("sigma_tau", "lower"), at("sigma_tau", "upper"),
+    plugin_gap(f)$at_mean_sigma2[1], prob_above(f), at("V", "mean"))
+}, numeric(7)))
+table_g1 <- cbind(c(-.130, -.081, -.163, -.117, -.124),
+                  c(.188, .189, .203, .184, 2.807),
+                  c(.127, .086, .122, .124, .610),
+                  c(.266, .339, .318, .261, 4.949),
+                  c(.691, .691, .740, .673, .353),
+                  c(.973, .818, .972, .955, .114),
+                  c(.237, .158, .282, .260, .313))
+stopifnot(isTRUE(all.equal(unname(round(g1, 3)), table_g1)))
+lo <- analyses[["Log odds"]]
+lo_tab <- tab[tab$analysis == "Log odds", ]
+stopifnot(isTRUE(all.equal(
+  round(c(lo_tab$I, lo_tab$I_lower, lo_tab$I_upper, prob_above(lo),
+          lo_tab$H, lo_tab$V), 3),
+  c(.530, .253, .743, .627, .035, .306))))
+pooled <- tab[tab$analysis == "Pooled", ]
+```
+
+Rounded as the paper rounds them, the first five rows are the entries of its
+Table 5, and the last row gives $I$ and $H$ in the log-odds row of its Table
+G.2. The other numbers in the paper's Tables G.1 and G.2 for these analyses,
+such as the posterior mean of $\sigma_\tau$, $I$ at $E(\sigma_\tau^2)$ and
+Pr(I > 1/2), round to the paper's entries in the same way. Pooled passing,
+for example, has $I = `r num(pooled$I, 4)`$ with the interval from
+`r num(pooled$I_lower, 4)` to `r num(pooled$I_upper, 4)`, which Table 5
+prints as `r as_printed(pooled$I)` [`r as_printed(pooled$I_lower)`,
+`r as_printed(pooled$I_upper)`].
+
+For each analysis we then find the largest difference between the two
+engines over the posterior means and the ends of the intervals, in four
+groups:
+
+- the bounded diagnostics and the probability that $I$ exceeds 1/2
+- $J_{\mathrm{eff}}$, relative to its value
+- $\sigma_\tau$ and the mean effect, in units of $\sqrt{\mathrm{GM}(v)}$
+- $\sigma_\tau^2$, relative to its value
+
+
+```{r engine-differences}
+differences <- function(a, b) {
+  pa <- profile_summary(a)
+  pb <- profile_summary(b)
+  at <- function(p, q) unlist(p[p$quantity == q, c("mean", "lower", "upper")])
+  gap <- function(q) abs(at(pa, q) - at(pb, q))
+  rel <- function(q) abs(at(pa, q) / at(pb, q) - 1)
+  c(bounded = max(gap("I"), gap("mean"), gap("H"),
+                  abs(prob_above(a) - prob_above(b))),
+    J_eff = max(rel("J_eff")),
+    effect_scale = max(gap("sigma_tau"), gap("effect_mean")) /
+      exp(mean(log(site_table(a)$se))),
+    sigma_tau2 = max(rel("sigma_tau2")))
+}
+engines <- t(mapply(differences, analyses, adaptive))
+signif(engines, 2)
+```
+
+```{r engine-facts, include = FALSE}
+largest <- apply(engines, 2, max)
+tolerance <- c(bounded = 1e-9, J_eff = 1e-9, effect_scale = 1e-9,
+               sigma_tau2 = 1e-8)
+orders <- floor(min(log10(tolerance / largest)))
+stopifnot(all(largest < tolerance / 1000), orders >= 3)
+```
+
+Across the 6 analyses the engines differ by at most
+`r sci_up(largest[["bounded"]])` on the bounded diagnostics,
+`r sci_up(largest[["J_eff"]])` relative on $J_{\mathrm{eff}}$,
+`r sci_up(largest[["effect_scale"]])` of $\sqrt{\mathrm{GM}(v)}$ on
+$\sigma_\tau$ and the mean effect, and `r sci_up(largest[["sigma_tau2"]])`
+relative on $\sigma_\tau^2$, at least `r orders` orders of magnitude inside
+the tolerances.
+
+The package's tests make the same fits and compare them, under both engines,
+with full-precision reference values computed for @lee2026 and stored in
+`tests/testthat/cases/ocrs-reference.rds`. For each analysis they compare 24
+of the 28 stored summaries, including every number for these analyses that
+the paper's tables print, within the tolerances above. In the same file,
+`tests/testthat/test-posterior-reference.R`, they do this for 6 simulated
+data sets whose reference values are stored in
+`tests/testthat/cases/boundary-cases.rds`. Slower tests in
+`tests/testthat/test-engines-slow.R` compare the engines on the 6 analyses
+and on 500 random data sets of 3 to 200 sites. In these data sets the
+sampling variances spread over several orders of magnitude, and about a
+tenth of them have an outlying estimate. The slow tests also run the node
+rule alone on 400 extreme data sets, with up to 10,000 sites and ratios of
+sampling variances up to $10^8$, and require finite, ordered summaries and
+every check within its limit. These tests take several minutes and run only
+when the environment variable `POOLINFO_SLOW` is `"true"`. From the
+package's source directory, this command runs them:
+
+```sh
+POOLINFO_SLOW=true Rscript -e 'devtools::test(filter = "engines-slow")'
+```
+
+## Beyond the paper
+
+The paper's computations are for a common mean and the flat prior. The
+package goes beyond them in five places, and for each we give the derivation
+and the tests that check it.
+
+### Mean models
+
+With $\beta$ integrated out, site $j$'s effect given $\sigma_\tau$ has
+posterior mean $S_j\hat\tau_j + (1 - S_j)\,x_j^\top b$ and variance
+$\sigma_\tau^2(1 - S_j) + (1 - S_j)^2\, x_j^\top (X^\top W X)^{-1} x_j$,
+where $x_j^\top (X^\top W X)^{-1} x_j = h_{jj}/w_j$ and $h_{jj}$ is the
+$j$th diagonal element of $W^{1/2}X$'s hat matrix. The tests compare $g$
+with metafor's restricted likelihood for $p = 1, 2, 3$ and with a
+two-dimensional brute-force integral over $\beta$. They also compare the
+conditional moments of the site effects with a joint normal computation in
+which $\beta$ has a very diffuse normal prior.
+
+### Proper priors
+
+The half-normal, half-t, half-Cauchy and uniform priors of `sd_prior()`
+enter $g$ through $\pi(\sigma_\tau)$. The tail bound above contains
+$\pi(\sigma_\tau)$, and the integral of the bound times $\sigma_\tau^q$
+beyond $B$ has a closed form, or a closed-form bound, for each prior. It is
+a power of $B$ for the flat and half-t priors, a normal tail probability or
+an upper incomplete gamma function for the half-normal, and 0 for the
+uniform prior, whose upper limit is $B$. We test the posteriors under each
+prior against brute-force integrals, and each bound against the integral
+that it bounds.
+
+### Intervals for H
+
+With the $v_j$ fixed, $\mathrm{logit}\, S_j = \log\sigma_\tau^2 - \log v_j$,
+so the centered logits $\Delta_j = \log\{\mathrm{GM}(v)/v_j\}$ do not depend
+on $\sigma_\tau$, which acts only through
+$m = \mathrm{logit}\, I = \log\{\sigma_\tau^2/\mathrm{GM}(v)\}$. Along this
+path $dH/dm = \bar S - I$ [@lee2026, Proposition 2(i)], and differentiating
+once more gives
+
+$$
+\frac{d^2 H}{dI^2} = -\frac{J^{-1}\sum_j (S_j - I)^2}{\{I(1 - I)\}^2},
+$$
+
+```{r concavity-facts, include = FALSE}
+step <- 1e-4
+path <- profile_path(fit, I = 0.4 + c(-step, 0, step))
+second <- (path$H[3] - 2 * path$H[2] + path$H[1]) / step^2
+S_04 <- site_reliability(se = ocrs$se, sigma_tau = path$sigma_tau[2])
+stopifnot(abs(second + mean((S_04 - 0.4)^2) / (0.4 * 0.6)^2) < 1e-5)
+```
+
+which is negative unless all the $v_j$ are equal, and then $H$ and the gap
+are 0 for every $\sigma_\tau$. With unequal sampling variances, $H$ is
+therefore strictly concave in $I$ and has a single peak, where
+$\bar S = I$. @lee2026 locates the peak by scans at two resolutions; since
+there is only one, the package finds the single root of $\bar S - I$ and
+keeps a scan as a check. For $0 < h < H_{\max}$
+there are two values $\sigma_1(h) < \sigma_2(h)$ of $\sigma_\tau$ at which
+$H = h$, and $H \le h$ if and only if $\sigma_\tau \le \sigma_1(h)$ or
+$\sigma_\tau \ge \sigma_2(h)$. With $F$ the posterior distribution function
+of $\sigma_\tau$,
+
+$$
+P(H \le h) = F\{\sigma_1(h)\} + 1 - F\{\sigma_2(h)\}.
+$$
+
+The package finds $\sigma_1(h)$ and $\sigma_2(h)$ by Newton's method in $m$,
+kept inside a bracket by bisection, with the exact derivative $\bar S - I$,
+and solves this equation for the quantiles of $H$. Near a constant profile,
+or when $I$ is close to 1, $\bar S$ and $I$ agree in most of their digits,
+and their plain difference loses those digits. To keep them, the package
+uses the exact identity $S_j - I = -(1 - I)\, S_j\{\exp(-\Delta_j) - 1\}$,
+evaluated with `expm1()`, and subtracts $I(1 - I)$ times the mean of the
+computed $\Delta_j$, which rounding moves slightly away from 0.
+
+### Draws from other software
+
+The diagnostics depend on the draws only through $\sigma_\tau$, so draws of
+$\sigma_\tau$ from any algorithm that targets the same model and prior give
+the same posterior summaries, up to Monte Carlo error. `reliability_draws()`
+computes their Monte Carlo standard errors with the effective sample sizes
+of `posterior::ess_mean()` [@vehtari2021]. Its site summaries average over
+the draws of the mean rather than integrate the mean out. In the tests,
+draws from `profile_draws()` go to `reliability_draws()`, whose posterior
+means must be within 4.5 Monte Carlo standard errors of the integrals.
+
+You can compare a brms fit [@burkner2017] of the eight schools with the
+integrals in the same way. In brms a standard deviation is bounded below at
+0, so a Student t prior of class `sd` is the half-t of `sd_prior()`, and an
+empty prior on the intercept makes the prior on the mean flat.
+
+```{r brms, eval = FALSE}
+library(brms)
+fit_brms <- brm(
+  estimate | se(se) ~ 1 + (1 | school), data = eight_schools,
+  prior = c(prior("", class = Intercept),
+            prior(student_t(3, 0, 10), class = sd)),
+  chains = 4, iter = 4000, seed = 1, control = list(adapt_delta = 0.99)
+)
+from_brms <- reliability_draws(fit_brms)
+from_brms
+exact <- reliability_posterior(estimate, se = se, site = school,
+                               data = eight_schools,
+                               prior = sd_prior("half_t", scale = 10, df = 3))
+exact
+```
+
+The posterior means that `from_brms` prints should differ from those of
+`exact` by no more than a few of the Monte Carlo standard errors printed
+beside them.
+
+### Confidence intervals for the between-site variance
+
+In metafor's notation $\sigma_\tau^2$ is $\tau^2$. Suppose an interval $C$
+covers $\sigma_\tau^2$ with probability $1 - \alpha$. Because $I$ increases
+with $\sigma_\tau^2$, the interval between $I$ at the ends of $C$ covers $I$
+with the same probability, and so does the interval for $\bar S$. So does
+the interval for $J_{\mathrm{eff}}$ when the sampling variances differ;
+when they are all equal, $J_{\mathrm{eff}} = J$ for every $\sigma_\tau$ and
+its interval is the single value $J$. $H$ is not monotone, and `map_tau2_interval()` reports
+its smallest and largest values over $C$ instead, using $H$'s peak when the
+peak lies inside $C$. That range contains $H$ whenever $C$ contains
+$\sigma_\tau^2$, so its coverage is at least $1 - \alpha$.
+
+For a metafor fit, $C$ is the Q-profile interval of @viechtbauer2007 for
+the model of the fit, moderators included. With $Q(\sigma_\tau^2)$ the
+weighted residual sum of squares of the estimates at $\sigma_\tau^2$ (the
+generalized $Q$ statistic), its lower end solves
+$Q(\sigma_\tau^2) = \chi^2_{J-p,\,1-\alpha/2}$ and its upper end
+$Q(\sigma_\tau^2) = \chi^2_{J-p,\,\alpha/2}$, where $\chi^2_{J-p,\,q}$ is
+the $q$ quantile; an end is 0 when $Q(0)$ is already below its quantile.
+`map_tau2_interval()` solves these equations itself, for
+$\log(\sigma_\tau^2 / \mathrm{GM}(v))$, so that the ends do not depend on
+the units of the effects and an end close to 0 has the same relative
+precision as one far above it. It does so for every estimator of metafor,
+also for `GENQ` and `GENQM` fits, whose own `confint()` uses another
+method. The tests compare the mapped ends with the profiles
+at the ends of the interval, and the upper end for $H$ with $H$'s peak when
+the peak lies inside the interval. For the eight schools they also compare
+the end found with that of `confint()` run with a wider limit. We fit the
+eight schools with metafor and map its interval.
+
+```{r tau2, eval = has_metafor}
+reml <- metafor::rma(estimate, sei = se, data = eight_schools,
+                     method = "REML")
+confint(reml)
+mapped <- map_tau2_interval(reml)
+attr(mapped, "interval")
+mapped
+```
+
+```{r tau2-facts, include = FALSE, eval = has_metafor}
+ci <- confint(reml)
+end <- attr(mapped, "interval")[["upper"]]
+gm_v8 <- exp(mean(log(eight_schools$se^2)))
+I_at <- function(s2) s2 / (s2 + gm_v8)
+stopifnot(identical(ci$ub.sign, ">"), ci$random["tau^2", "ci.ub"] == 100,
+          end > 200, abs(mapped$upper[1] - I_at(end)) < 1e-12)
+```
+
+`r if (has_metafor) sprintf("metafor reports the upper end as above %s, and the interval that is mapped ends at %s. Through $I$ the difference is large, since $I$ is %s at %s and %s at %s.", format(ci$random["tau^2", "ci.ub"]), num(end, 1), num(I_at(100)), format(ci$random["tau^2", "ci.ub"]), num(I_at(end)), num(end, 1))`
+
+## Notation
+
+The paper and the package write some quantities differently. For each
+quantity, the table below gives the paper's symbol, the package's symbol or
+name, and the meaning.
+
+| Paper | Package | Meaning |
+|:---|:---|:---|
+| $\hat\tau_j$, $v_j$ | $\hat\tau_j$, $v_j$, `estimate`, `se2` (`se`$^2$) | site estimate and sampling variance |
+| $\sigma$, $a = \sigma^2$ | $\sigma_\tau$, $\sigma_\tau^2$, `sigma_tau`, `sigma_tau2` | between-site standard deviation and variance |
+| $\tau$ | $\mu$, `effect_mean` | mean of the site effects |
+| none | `effect`, a column of `site_table()` | posterior mean of a site's effect |
+| none | $\beta$, `coef_*` | coefficients of the mean model |
+| $\tilde v$ | $\mathrm{GM}(v)$ | geometric mean of the $v_j$ |
+| $g(\sigma)$ | $g(\sigma_\tau)$ | unnormalized posterior density of the between-site standard deviation |
+| $S_j$ | `reliability`, `site_reliability()` | site reliability |
+| $I$ | `I`, `kl_centroid()` | informativeness |
+| $\bar S$ | `mean` | mean reliability |
+| $\mathrm{HM}(S)$ | `harmonic` | harmonic centroid |
+| $H$ | `H`, `kl_dispersion()` | dispersion |
+| $V$, $\rho_3$ | `V`, `rho3`, `logit_moments()` | logit variance and third absolute logit moment |
+| $J_{\mathrm{eff}}$ | `J_eff`, `concentration_count()` | concentration count |
+| $m$ | `logit_I`, a column of `profile_path()` | logit of $I$ |
+| $\Delta_j$ | $\Delta_j$ | centered logits, $\mathrm{logit}\, S_j - m$ |
+| $R_H$, $R_S$ | `exact` minus `leading`, columns of `local_terms()` | remainders of Proposition 2 |
+| $\sqrt3\rho_3/108$, $\rho_3/48$ | `bound`, a column of `local_terms()` | bounds on $\lvert R_H\rvert$ and $\lvert R_S\rvert$ |
+| $\kappa$, $n_j$ | $\kappa_j$, $n_j$, `kappa`, `n` | variance constant and site size, $v_j = \kappa_j/n_j$ |
+
+## References

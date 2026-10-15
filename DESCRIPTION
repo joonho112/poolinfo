@@ -1,0 +1,53 @@
+Package: poolinfo
+Type: Package
+Title: Reliability-Profile Diagnostics for Partial Pooling
+Version: 0.1.0
+Authors@R: person("JoonHo", "Lee",
+    role = c("aut", "cre", "cph"),
+    email = "jlee296@ua.edu",
+    comment = c(ORCID = "0009-0006-4019-8703"))
+Description: Summarizes how much a set of estimates with known standard
+    errors, such as the site estimates of a multisite trial, the studies of
+    a meta-analysis or the direct estimates of small areas, can say about
+    the individual units under a normal hierarchical model. Computes the
+    site reliabilities and their informativeness, mean reliability,
+    dispersion and concentration, with posterior means and intervals from
+    numerical integration over the between-site standard deviation, design
+    calculations, plots made with 'ggplot2', and tables and sentences for
+    reporting. The diagnostics
+    follow Lee (2026). Supported by the Institute of Education Sciences
+    through Grant R305D240078 to the University of Alabama.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Language: en-US
+Depends:
+    R (>= 4.1.0)
+Imports:
+    graphics,
+    stats,
+    utils,
+    rlang (>= 1.1.0),
+    ggplot2 (>= 3.5.0),
+    patchwork (>= 1.2.0)
+Suggests:
+    cli (>= 3.6.0),
+    metafor,
+    multisiteDGP,
+    posterior,
+    brms,
+    ebnm,
+    testthat (>= 3.2.0),
+    vdiffr,
+    withr (>= 2.5.0),
+    knitr,
+    rmarkdown,
+    ragg,
+    spelling,
+    covr
+Config/testthat/edition: 3
+URL: https://github.com/joonho112/poolinfo, https://joonho112.github.io/poolinfo/
+BugReports: https://github.com/joonho112/poolinfo/issues
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.0
+LazyData: true
+VignetteBuilder: knitr

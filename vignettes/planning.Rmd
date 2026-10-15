@@ -1,0 +1,424 @@
+---
+title: "Planning a multisite trial"
+description: "The reliability profile of a planned trial: sampling variances from site sizes, unequal site sizes, the number of sites against the size per site, and allocations under a budget."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Planning a multisite trial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) knitr::opts_chunk$set(dev = "ragg_png")
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+pct <- function(x) round(100 * x)
+big <- function(x) format(round(x), big.mark = ",")
+```
+
+Before a multisite trial collects any data, its design already
+determines, approximately, the sampling variances of the site estimates.
+They follow from the number of individuals in each site and the proportion
+assigned to treatment, together with planning values of the outcome
+variance and of the proportion of it that covariates explain. With a
+planning value of the between-site standard deviation $\sigma_\tau$ as
+well, we can compute the reliability profile that the trial would have. In
+this vignette we compute it for a planned trial of 40 schools. We then use
+it to compare ways of dividing the students among the schools, numbers of
+schools, and ways of spending a budget when some schools cost more per
+student than others.
+
+```{r library}
+library(poolinfo)
+```
+
+We measure effects in standard deviations of the outcome, as many power
+calculations do, so the outcome variance is 1, the default of the argument
+`var_outcome` in the functions below.
+
+## Sampling variances from site sizes
+
+Take a difference in means between the two arms of site $j$, with a
+proportion $p_j$ of its $n_j$ individuals in treatment and covariates that
+explain a proportion $R^2$ of the within-arm outcome variance $s_j^2$. A common
+planning approximation of its sampling variance is [@lee2026]
+
+$$
+v_j = \frac{\kappa_j}{n_j}, \qquad
+\kappa_j = \left(\frac{1}{p_j} + \frac{1}{1 - p_j}\right)s_j^2 (1 - R^2).
+$$
+
+We compute it with `neyman_variance()` for sites of 20, 50 and 100
+students with half of each site in treatment, first without covariates
+and then with covariates that explain 40% of the outcome variance.
+
+```{r neyman}
+v0 <- neyman_variance(c(20, 50, 100), p = 0.5)
+v0
+v1 <- neyman_variance(c(20, 50, 100), p = 0.5, R2 = 0.4)
+v1
+```
+
+```{r neyman-facts, include = FALSE}
+kappa0 <- unique(round(c(20, 50, 100) * v0, 12))
+kappa1 <- unique(round(c(20, 50, 100) * v1, 12))
+stopifnot(length(kappa0) == 1L, length(kappa1) == 1L,
+          abs(v0[3] / v0[1] - 1 / 5) < 1e-12, all(abs(v1 / v0 - 0.6) < 1e-12))
+```
+
+Without covariates every site has $n_j v_j = `r kappa0`$, so
+$\kappa = `r kappa0`$, and a site of 100 students has a fifth of the
+variance of a site of 20. Covariates that explain 40% of the outcome
+variance lower every variance by 40%, to $\kappa = `r kappa1`$. Designs
+with blocks, clusters within sites or other estimators need their own
+variance formula. For them, the planning functions below also take the
+constants $\kappa_j$ directly, through the argument `kappa`, so you can
+supply them from that formula.
+
+## The profile of a planned allocation
+
+Suppose a trial plans to recruit about 2,000 students in 40 schools whose
+sizes differ. As an example plan, we draw the 40 sizes from a lognormal
+distribution with mean 50 and coefficient of variation 0.5, and round them
+to whole students.
+
+```{r sizes}
+set.seed(1)
+cv <- 0.5
+var_log <- log(1 + cv^2)
+n <- round(rlnorm(40, meanlog = log(50) - var_log / 2, sdlog = sqrt(var_log)))
+c(total = sum(n), smallest = min(n), largest = max(n))
+```
+
+```{r sizes-facts, include = FALSE}
+cv_J <- sqrt(mean((n / mean(n) - 1)^2))
+stopifnot(cv_J < cv, abs(sum(n) - 2000) < 50)
+```
+
+The 40 sizes add up to `r big(sum(n))` students, from `r min(n)` to
+`r max(n)` per school. Their coefficient of variation,
+computed with divisor $J$, is `r num(cv_J)`, below the 0.5 of the
+distribution that we drew them from.
+
+We pass the planned sizes to `reliability_design()`, with the $\kappa$ of
+the previous section for half of each school in treatment and no
+covariates, and with three planning values of $\sigma_\tau$. It compares
+them with a balanced allocation. Here balance refers to the site sizes,
+made equal with the same total and the same number of sites, and within
+each site both allocations put half of the students in treatment.
+Planning values of $\sigma_\tau$ can come from the variation of effects
+across sites in earlier multisite trials of similar programs
+[@weiss2017], and
+@raudenbush2015 describe how such trials estimate it. Printing the design
+shows the comparison at the first planning value.
+
+```{r design}
+design <- reliability_design(n, sigma_tau = c(0.15, 0.2, 0.25), kappa = 4)
+design
+```
+
+```{r design-facts, include = FALSE}
+ps <- profile_summary(design)
+val <- function(alloc, q) ps$mean[ps$allocation == alloc & ps$quantity == q]
+gm <- exp(mean(log(n)))
+stopifnot(
+  all(design$kappa == kappa0),
+  val("planned", "I") < val("balanced", "I"),
+  val("planned", "mean") < val("balanced", "mean"),
+  val("planned", "H") > 0, val("balanced", "H") == 0,
+  val("planned", "J_eff") < 40, abs(val("balanced", "J_eff") - 40) < 1e-9,
+  abs(val("planned", "I") - 0.15^2 / (0.15^2 + 4 / gm)) < 1e-12,
+  design$efficiency < 1, abs(design$local$cv - cv_J) < 1e-12
+)
+```
+
+At $\sigma_\tau = `r design$sigma_tau[1]`$ the planned sizes give an
+informativeness of `r num(val("planned", "I"), 3)`, against
+`r num(val("balanced", "I"), 3)` for equal sizes, and a mean reliability
+of `r num(val("planned", "mean"), 3)` against
+`r num(val("balanced", "mean"), 3)`. Unequal sizes also make the
+reliabilities unequal, so the planned allocation has a dispersion of
+`r num(val("planned", "H"), 4)` and a concentration count of
+`r num(val("planned", "J_eff"), 1)`, where equal sizes give 0 and 40.
+
+Only the geometric mean $\tilde n$ of the sizes enters the
+informativeness, because the geometric mean of the sampling variances is
+$\kappa / \tilde n$. So
+
+$$
+I = \frac{\sigma_\tau^2}{\sigma_\tau^2 + \kappa / \tilde n}, \qquad
+\tilde n = \Big(\prod_j n_j\Big)^{1/J}.
+$$
+
+Here $\tilde n = `r num(gm, 1)`$, while the average size $\bar n$ is
+`r num(mean(n), 1)`. For a fixed number of sites and a fixed total, equal
+sizes make $\tilde n$ as large as possible, so they maximize the
+informativeness, and they maximize the mean reliability too [@lee2026,
+Proposition 4].
+
+Since $\mathrm{logit}\, I = \log(\sigma_\tau^2 / \kappa) + \log \tilde n$,
+the planned sizes have a logit of $I$ lower by
+$\log(\bar n / \tilde n) = `r num(-log(design$efficiency), 3)`$ at every
+planning value, and so an $I$ lower by about $I(1 - I)$ times as much,
+which is largest near $I = 1/2$. For each planning value, the component
+`scenarios` of the design has the informativeness of both allocations.
+
+```{r scenarios}
+design$scenarios
+```
+
+```{r scenarios-facts, include = FALSE}
+sc <- design$scenarios
+loss <- sc$I_balanced - sc$I_planned
+stopifnot(
+  all(abs(qlogis(sc$I_balanced) - qlogis(sc$I_planned) +
+            log(design$efficiency)) < 1e-12),
+  all(diff(loss) > 0), all(sc$I_balanced < 0.5),
+  all(abs(loss - sc$I_planned * (1 - sc$I_planned) *
+            -log(design$efficiency)) < 0.002)
+)
+```
+
+Relative to equal sizes, the plan loses `r num(loss[1], 3)` of
+informativeness at $\sigma_\tau = `r sc$sigma_tau[1]`$ and
+`r num(loss[3], 3)` at `r sc$sigma_tau[3]`, where $I$ is closer to 1/2.
+
+## Unequal site sizes
+
+The ratio of the geometric to the arithmetic mean of the sizes,
+`design$efficiency`, is `r num(design$efficiency, 3)` for this plan. For
+sizes close to their mean it is about $\exp(-\mathrm{CV}^2/2)$, with the
+coefficient of variation computed with divisor $J$. For a lognormal
+population of sizes the ratio is $(1 + \mathrm{CV}^2)^{-1/2}$, a statement
+about the population rather than about any finite set of sizes [@lee2026,
+Appendix E.2]. `imbalance_ratio()` gives both, and we compare them at three
+coefficients of variation.
+
+```{r imbalance}
+cvs <- c(0.25, 0.5, 0.75)
+round(rbind(lognormal = imbalance_ratio(cvs),
+            local = imbalance_ratio(cvs, type = "local")), 3)
+```
+
+```{r imbalance-facts, include = FALSE}
+ir <- rbind(lognormal = imbalance_ratio(cvs),
+            local = imbalance_ratio(cvs, type = "local"))
+apart <- ir["lognormal", ] - ir["local", ]
+stopifnot(apart[1] < 0.001, all(diff(apart) > 0))
+```
+
+At a coefficient of variation of 0.25 the two differ by less than 0.001,
+and at 0.75 the population ratio is `r num(ir[1, 3], 3)` against
+`r num(ir[2, 3], 3)` for the approximation. We plot both curves with
+`plot_design()`, which marks the planned allocation.
+
+```{r imbalance-plot, fig.alt = "The ratio of the geometric to the arithmetic mean of the site sizes against their coefficient of variation, for a lognormal population and as the local approximation, with the planned allocation a little below both curves."}
+plot_design(design, type = "imbalance")
+```
+
+```{r imbalance-plot-facts, include = FALSE}
+at_cv <- c(local = imbalance_ratio(cv_J, type = "local"),
+           lognormal = imbalance_ratio(cv_J))
+stopifnot(all(design$efficiency < at_cv),
+          at_cv[["local"]] < at_cv[["lognormal"]])
+```
+
+As the sizes spread out, the curves diverge, the local approximation
+falling faster. The planned point, at a coefficient of variation of
+`r num(cv_J)`, lies a little below both, with a ratio of
+`r num(design$efficiency, 3)` against `r num(at_cv[["local"]], 3)` on the
+local curve and `r num(at_cv[["lognormal"]], 3)` on the lognormal one. A
+finite set of sizes has a ratio that depends on more than their
+coefficient of variation, so neither curve reproduces it [@lee2026,
+Appendix E.2].
+
+## More sites or larger sites
+
+With equal sizes and a fixed total $N$, the informativeness is
+$I = \sigma_\tau^2 / (\sigma_\tau^2 + \kappa J / N)$, which falls as the
+$N$ individuals are spread over more sites. With $\sigma_\tau$ and the
+$v_j$ known, the generalized least squares estimate of the mean effect has
+variance $\sigma_\tau^2 / J + \kappa / N$, and that falls as well
+[@lee2026, Appendix E.3]. At a fixed total, then, more sites lower the
+informativeness but make the mean effect more precise. With
+`type = "sites"`, `plot_design()` plots the two against the number of
+sites, one above the other, at the planned total and the first planning
+value of $\sigma_\tau$.
+It divides the standard error of the mean effect by its value at the
+planned 40 sites.
+
+```{r sites-plot, fig.height = 5, fig.alt = "Two panels against the number of sites, at the planned total and the first planning value of sigma_tau. The upper panel is the informativeness of equal site sizes, which falls as sites are added. The lower panel is the standard error of the mean effect relative to its value at 40 sites, which also falls, quickly at first and then slowly."}
+plot_design(design, type = "sites")
+```
+
+```{r sites-facts, include = FALSE}
+N <- sum(n)
+s1 <- design$sigma_tau[1]
+I_at <- function(J) s1^2 / (s1^2 + 4 * J / N)
+se_at <- function(J) sqrt(s1^2 / J + 4 / N)
+stopifnot(abs(I_at(40) - val("balanced", "I")) < 1e-12,
+          I_at(20) > I_at(40), I_at(80) < I_at(40),
+          se_at(20) > se_at(40), se_at(80) < se_at(40))
+```
+
+Halving the number of schools
+to 20, with the same `r big(N)` students, would raise $I$ from
+`r num(I_at(40))` to `r num(I_at(20))` and the standard error of the mean
+effect by `r pct(se_at(20) / se_at(40) - 1)`%. Doubling it to 80 would
+lower $I$ to `r num(I_at(80))` and the standard error by
+`r pct(1 - se_at(80) / se_at(40))`%.
+
+We can also start from a target informativeness. `solve_design()` turns a
+target into a design with equal site sizes. With a given total it finds
+the largest number of sites that reaches the target, and with a given
+number of sites the size per site that the target needs. We use 1/2 as an
+example target. At $I = 1/2$ the between-site variance equals the
+geometric mean of the sampling variances, so a site with that sampling
+variance keeps half of its own estimate in its posterior mean. It is also
+where the leading term of the gap between the mean reliability and $I$
+changes sign. First we fix the total at 2,000 students.
+
+```{r solve-total}
+by_total <- solve_design(target_I = 0.5, sigma_tau = c(0.15, 0.2, 0.25),
+                         kappa = 4, N = 2000)
+by_total
+```
+
+```{r solve-total-facts, include = FALSE}
+stopifnot(identical(by_total$J, c(11, 20, 31)), all(by_total$I >= 0.5),
+          abs(by_total$n_per_site[2] - 100) < 1e-9)
+```
+
+With `r big(by_total$N[1])` students the target allows `r by_total$J[2]`
+schools of `r num(by_total$n_per_site[2], 0)` students at
+$\sigma_\tau = `r by_total$sigma_tau[2]`$, but only `r by_total$J[1]`
+schools if $\sigma_\tau$ is `r by_total$sigma_tau[1]`, and
+`r by_total$J[3]` if it is `r by_total$sigma_tau[3]`. Its column `I` gives
+the informativeness reached with the number of sites rounded down, at or a
+little above the target. Next we keep the plan's 40 schools and ask for
+the size per site at $\sigma_\tau = 0.2$.
+
+```{r solve-sites}
+by_sites <- solve_design(target_I = 0.5, sigma_tau = 0.2, kappa = 4, J = 40)
+by_sites
+```
+
+```{r solve-sites-facts, include = FALSE}
+stopifnot(abs(by_sites$N / 2000 - 2) < 1e-9)
+```
+
+Each school would need `r num(by_sites$n_per_site, 0)` students,
+`r big(by_sites$N)` in all, about twice the planned total. Because
+$\sigma_\tau$ is unknown when a trial is planned, we would give such
+answers for each planning value rather than as one number. Which target
+suits a trial depends on its purpose. A trial run to estimate the mean
+effect is planned for the standard error of that estimate, as in the plot
+above. One run to estimate or rank the site effects would plan for the
+informativeness as well.
+
+## Sizes under a budget
+
+When recruiting costs more in some schools than in others, the
+informativeness for a given budget $B$ is largest in a continuous allocation
+when every school gets the same spending [@lee2026, Appendix E.3]. With costs
+$c_j$ per student, that means $n_j = B / (J c_j)$.
+`balanced_allocation(integer = FALSE)` computes this allocation, with optional
+bounds on the sizes. The default integer allocation is optimal with equal
+costs; with unequal costs it uses a greedy rounding rule that need not find
+the integer optimum and may leave some budget unused. In our example half
+of the 40 schools cost twice as much per student, and the budget is 3,000.
+
+```{r budget}
+cost <- rep(c(1, 2), each = 20)
+sizes <- balanced_allocation(40, cost = cost, budget = 3000)
+table(sizes, cost)
+```
+
+```{r budget-facts, include = FALSE}
+stopifnot(all(sizes[cost == 1] == 75), all(sizes[cost == 2] %in% c(37, 38)),
+          attr(sizes, "spent") == 3000)
+```
+
+Each of the cheaper schools gets `r unique(sizes[cost == 1])` students and
+each of the others `r min(sizes[cost == 2])` or
+`r max(sizes[cost == 2])`, so the spending per school is the same up to
+the rounding to whole students. In all, the budget pays for
+`r big(attr(sizes, "total"))` students. To see what equal spending gains,
+we compare it with 50 students in every school, which costs the same
+3,000. Given `cost`, `reliability_design()` compares the planned sizes
+with equal spending of the same budget instead of with equal sizes.
+
+```{r budget-design}
+equal <- rep(50, 40)
+reliability_design(equal, sigma_tau = 0.15, kappa = 4, cost = cost)
+```
+
+```{r budget-design-facts, include = FALSE}
+bd <- reliability_design(equal, sigma_tau = 0.15, kappa = 4, cost = cost)
+bs <- profile_summary(bd)
+bval <- function(alloc, q) bs$mean[bs$allocation == alloc & bs$quantity == q]
+stopifnot(sum(cost * equal) == 3000,
+          all(abs(bd$balanced_n - 3000 / (40 * cost)) < 1e-9),
+          bval("equal spending", "I") > bval("planned", "I"),
+          bval("equal spending", "mean") > bval("planned", "mean"),
+          bval("equal spending", "H") > 0, bval("equal spending", "J_eff") < 40)
+```
+
+Equal spending raises the informativeness from
+`r num(bval("planned", "I"), 3)` to `r num(bval("equal spending", "I"), 3)`
+and the mean reliability from `r num(bval("planned", "mean"), 3)` to
+`r num(bval("equal spending", "mean"), 3)`, and the same budget pays for
+`r big(sum(bd$balanced_n))` students instead of `r big(sum(equal))`. Its
+reliabilities are no longer equal, so its dispersion is
+`r num(bval("equal spending", "H"), 4)` and its concentration count
+`r num(bval("equal spending", "J_eff"), 1)`.
+
+## Writing down the plan
+
+For a protocol or a proposal, `report_text()` writes the comparison as
+sentences. We ask for three decimals, because with the default two the
+planned and balanced mean reliabilities, `r num(val("planned", "mean"), 3)`
+and `r num(val("balanced", "mean"), 3)`, would print as the same number.
+
+```{r report}
+plan <- report_text(design, outcome = "the test score", digits = 3)
+writeLines(strwrap(plan))
+```
+
+```{r report-facts, include = FALSE}
+stopifnot(num(val("planned", "mean")) == num(val("balanced", "mean")),
+          num(val("planned", "mean"), 3) != num(val("balanced", "mean"), 3))
+```
+
+Like the printed design, the sentences use the first planning value. A
+plan would add the other two from `design$scenarios`, where at
+$\sigma_\tau = `r sc$sigma_tau[2]`$ and `r sc$sigma_tau[3]` the planned
+sizes give an informativeness of `r num(sc$I_planned[2], 3)` and
+`r num(sc$I_planned[3], 3)`, and equal sizes `r num(sc$I_balanced[2], 3)`
+and `r num(sc$I_balanced[3], 3)`.
+
+## Planning your own trial
+
+For your own trial, you give `reliability_design()`
+
+- the planned site sizes, or sizes drawn from a plausible distribution, as
+  above, when they are not yet known;
+- `p`, `R2` and `var_outcome` for the variance formula above, or constants
+  `kappa` from a formula that suits your design;
+- a few planning values of `sigma_tau`, in the units of your effects;
+- the costs per individual, `cost`, if they differ between sites.
+
+With `type = "target"`, `plot_design()` plots the informativeness of equal
+site sizes against the size per site for each of your planning values,
+which shows how the size needed for a target moves with $\sigma_\tau$.
+Once the trial has run, `reliability_posterior()` gives the posterior of
+the same diagnostics from the site estimates, as `vignette("poolinfo")`
+shows.
+
+## References

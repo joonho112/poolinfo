@@ -1,0 +1,577 @@
+---
+title: "Reliability profiles and their summaries"
+description: "What the informativeness, the mean reliability, the dispersion and the concentration count describe, shown with profiles that have the same informativeness but different shapes."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Reliability profiles and their summaries}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) knitr::opts_chunk$set(dev = "ragg_png")
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+# Bounds in the text are rounded outward, so that they stay true.
+up <- function(x, digits = 2) num(ceiling(x * 10^digits - 1e-9) / 10^digits, digits)
+pct <- function(x) round(100 * x)
+```
+
+Two trials can have the same informativeness and still differ in what
+partial pooling does to their sites. In one, every site is about equally
+reliable. In another, a few precise sites stand next to many noisy ones.
+In this vignette we take the between-site standard deviation
+$\sigma_\tau$ as known and study the reliabilities themselves. We look at
+how the informativeness averages them, what the dispersion and the
+concentration count add, and how all four summaries change with
+$\sigma_\tau$, using the geometry of @lee2026 without deriving it.
+
+```{r library}
+library(poolinfo)
+```
+
+Site $j$'s reliability is $S_j = \sigma_\tau^2 / (\sigma_\tau^2 + v_j)$,
+where $v_j$ is the sampling variance of the site's estimate, and a trial's
+reliability profile is the set of its $J$ reliabilities. See
+`vignette("poolinfo")` for why $S_j$ is both a reliability and the
+shrinkage weight of the normal model.
+
+## Five profiles with the same informativeness
+
+Our examples come from the data set `example_profiles`, with the sampling
+variances of five artificial trials of 40 sites each and the reliabilities
+that they give at $\sigma_\tau = 0.2$. All five have the informativeness
+$I = 0.3$. They differ in their logit variance $V$, the variance of the
+logits $\mathrm{logit}\, S_j$ with divisor $J$. Because
+$\mathrm{logit}\, S_j = \log\sigma_\tau^2 - \log v_j$, $V$ is also the
+variance of the log sampling variances, and it does not change with
+$\sigma_\tau$. The five profiles are
+
+- `homogeneous`, in which every site has the same sampling variance, so
+  that $V = 0$;
+- `even`, with log variances spread evenly;
+- `bimodal`, with two groups of 20 sites, one precise and one noisy;
+- `concentrated_precise`, with 8 precise sites and 32 noisy ones;
+- `concentrated_noisy`, with 32 precise sites and 8 noisy ones.
+
+Apart from `homogeneous`, all have $V = 1.5$. R's `var()` divides by
+$J - 1$ instead and gives
+`r num(with(example_profiles, var(log(se2[profile == "even"]))))` for
+them.
+
+We make a profile of each trial with `reliability_profile()`, from its
+sampling variances and $\sigma_\tau$, and collect the five profiles with
+`compare_profiles()`.
+
+```{r profiles}
+by_shape <- split(example_profiles, example_profiles$profile)
+profiles <- lapply(by_shape, function(d) {
+  reliability_profile(se2 = d$se2, sigma_tau = 0.2)
+})
+cmp <- compare_profiles(.list = profiles)
+cmp
+```
+
+```{r profile-facts, include = FALSE}
+tab <- as.data.frame(cmp)
+rownames(tab) <- tab$analysis
+uneq <- tab[-1, ]
+val <- function(p, q) tab[p, q]
+stopifnot(
+  all(abs(tab$I - 0.3) < 1e-12),
+  all(abs(uneq$V - 1.5) < 1e-12), tab["homogeneous", "V"] == 0,
+  abs(tab["homogeneous", "J_eff"] - 40) < 1e-9,
+  abs(tab["homogeneous", "H"]) < 1e-12,
+  val("concentrated_noisy", "H") == min(uneq$H),
+  val("concentrated_precise", "H") == max(uneq$H),
+  val("concentrated_noisy", "mean") == max(uneq$mean),
+  val("concentrated_precise", "mean") == min(uneq$mean),
+  val("concentrated_precise", "J_eff") == min(tab$J_eff),
+  val("concentrated_noisy", "J_eff") == max(uneq$J_eff),
+  abs(val("even", "H") - val("bimodal", "H")) < 0.005,
+  abs(val("even", "mean") - val("bimodal", "mean")) < 0.01,
+  abs(val("even", "J_eff") - val("bimodal", "J_eff")) < 0.5
+)
+```
+
+In every row $I = 0.300$, while the mean reliability runs from
+`r num(val("homogeneous", "mean"), 3)` in the homogeneous profile to
+`r num(max(tab$mean), 3)`. Although the four unequal profiles have the
+same logit variance, their dispersions range from
+`r num(val("concentrated_noisy", "H"), 3)` to
+`r num(val("concentrated_precise", "H"), 3)` and their concentration
+counts from `r num(val("concentrated_precise", "J_eff"), 1)` to
+`r num(val("concentrated_noisy", "J_eff"), 1)`, against 0 and 40 for the
+homogeneous profile. Of the four, the profile with 8 noisy sites has the
+smallest dispersion and yet the largest mean reliability,
+`r num(val("concentrated_noisy", "mean"), 3)`. Its mirror image, with 8
+precise sites, combines the largest dispersion with the smallest mean
+reliability among them, `r num(val("concentrated_precise", "mean"), 3)`.
+So a larger dispersion need not come with a larger gap between the mean
+reliability and $I$ [@lee2026]. In every column the even and bimodal
+profiles are close to each other.
+
+Sorting the reliabilities of the two concentrated profiles shows where
+these differences come from. We put the two in one comparison, to use
+again below, and plot their sorted reliabilities in one panel.
+
+```{r two-shapes, fig.height = 4, fig.alt = "The sorted site reliabilities of the profiles with 8 precise and with 8 noisy sites, in one panel. In the first, 32 sites lie below the informativeness and 8 far above it; in the second, 8 lie far below it and 32 above it. A horizontal line marks the informativeness of both, 0.3."}
+two <- compare_profiles(
+  `8 precise` = profiles$concentrated_precise,
+  `8 noisy` = profiles$concentrated_noisy
+)
+plot(two, type = "profile")
+```
+
+```{r two-facts, include = FALSE}
+Sp <- profiles$concentrated_precise$S
+Sn <- profiles$concentrated_noisy$S
+stopifnot(length(unique(signif(Sp, 8))) == 2L,
+          length(unique(signif(Sn, 8))) == 2L,
+          sum(Sp < 0.3) == 32L, sum(Sn > 0.3) == 32L)
+```
+
+With 8 precise sites, the other 32 sit together at `r num(min(Sp))`,
+below $I$, and the precise ones at `r num(max(Sp))`. In the profile with 8
+noisy sites it is the other way around, with 32 sites at `r num(max(Sn))`,
+above $I$, and 8 at `r num(min(Sn))`. In each profile the few sites lie
+far from $I$ on the logit scale and the many lie close to it on the other
+side, so that the logits average to $\mathrm{logit}\, I$.
+
+## Three averages of the reliabilities
+
+On the logit scale, the informativeness is the plain average of the
+reliabilities,
+
+$$
+\mathrm{logit}\, I = \frac{1}{J}\sum_{j=1}^J \mathrm{logit}\, S_j,
+\qquad
+I = \frac{\sigma_\tau^2}{\sigma_\tau^2 + \mathrm{GM}(v)},
+$$
+
+where $\mathrm{GM}(v)$ is the geometric mean of the sampling variances.
+Because the logits are $\log\sigma_\tau^2 - \log v_j$, averaging them
+averages the log variances, which gives the second form.
+
+@lee2026 [Theorem 1] shows that $I$ is also the value $p$ that minimizes
+the average Kullback-Leibler divergence
+
+$$
+\frac{1}{J}\sum_{j=1}^J \mathrm{KL}\{\mathrm{Ber}(p) \,\|\, \mathrm{Ber}(S_j)\}.
+$$
+
+We call the minimizer of such an average a centroid of the
+reliabilities. This
+divergence is one of the Bregman divergences, and two others give the
+other familiar means. With $p$ in the first argument, as above, squared
+error gives the arithmetic mean $\bar S$, and the Bregman divergence of
+the Burg potential $-\log p$ gives the harmonic mean, our harmonic
+centroid. With $p$ in the second argument, all three divergences give
+$\bar S$. `reliability_centroids()` returns the three first-argument
+centroids, and we apply it to each profile.
+
+```{r centroids}
+centroids <- sapply(by_shape, function(d) reliability_centroids(d$reliability))
+round(t(centroids), 3)
+```
+
+```{r centroid-facts, include = FALSE}
+ce <- t(centroids)
+ce_uneq <- ce[-1, ]
+stopifnot(all(ce_uneq[, "harmonic"] < ce_uneq[, "I"]),
+          all(ce_uneq[, "mean"] > ce_uneq[, "I"]),
+          all(abs(ce["homogeneous", ] - 0.3) < 1e-12))
+```
+
+In the four unequal profiles the harmonic centroid, from
+`r num(min(ce_uneq[, "harmonic"]), 3)` to
+`r num(max(ce_uneq[, "harmonic"]), 3)`, lies below $I$. It is never
+larger than the other two, in any profile, and the three are equal only
+when all the reliabilities are, as in the homogeneous profile. Between $I$
+and $\bar S$, however, there is no general order. Here $\bar S > I$ in all
+four unequal profiles, the sign of $1 - 2I$. A profile close enough to
+constant must have that sign when $I \ne 1/2$, but a profile far from
+constant can have the other. @lee2026 gives one with 25 sites and
+$I = 0.3$, where one site is far more precise than the other 24, which
+are all alike. We build it from its centered logits
+$\Delta_j = \mathrm{logit}\, S_j - \mathrm{logit}\, I$, with mean 0 and
+variance $V = 2$.
+
+```{r counterexample}
+delta <- c(sqrt(48), rep(-sqrt(1 / 12), 24))
+S <- plogis(qlogis(0.3) + delta)
+reliability_centroids(S)
+```
+
+```{r counterexample-facts, include = FALSE}
+cents <- reliability_centroids(S)
+stopifnot(abs(mean(delta)) < 1e-12, abs(mean(delta^2) - 2) < 1e-12,
+          abs(cents[["I"]] - 0.3) < 1e-12,
+          cents[["mean"]] < cents[["I"]])
+```
+
+Its mean reliability, `r num(cents[["mean"]], 3)`, is below $I$ although
+$I < 1/2$. In the next section we give a condition that guarantees the
+sign of $1 - 2I$.
+
+## The dispersion and the gap between the averages
+
+The dispersion $H$ is the smallest value of the average divergence above,
+reached at $p = I$,
+
+$$
+H = \frac{1}{J}\sum_{j=1}^J \mathrm{KL}\{\mathrm{Ber}(I) \,\|\, \mathrm{Ber}(S_j)\},
+$$
+
+the average divergence of $I$ from the site reliabilities. It is 0 only for
+a constant profile.
+
+The sign of the gap $\bar S - I$ matters for the site effects. If
+$\sigma_\tau$ and the mean effect were known, the normal model would give
+the site effects an average posterior variance of
+$\sigma_\tau^2(1 - \bar S)$ [@lee2026, Proposition 2]. Equally reliable
+sites with the same $I$ would give $\sigma_\tau^2(1 - I)$, so a positive
+gap means a smaller average posterior variance than theirs, and a negative
+gap a larger one.
+
+Both $H$ and the gap have leading terms proportional to the logit
+variance $V$. With $\rho_3 = J^{-1}\sum_j |\Delta_j|^3$, the third
+absolute moment of the centered logits, Proposition 2 of @lee2026 gives
+
+$$
+\begin{aligned}
+H &= \tfrac12 I(1-I)V + R_H, &
+|R_H| &\le \tfrac{\sqrt3}{108}\,\rho_3,\\
+\bar S - I &= \tfrac12 I(1-I)(1-2I)V + R_S, &
+|R_S| &\le \tfrac{1}{48}\,\rho_3.
+\end{aligned}
+$$
+
+When the gap's leading term is larger than its bound in absolute value,
+the gap has the sign of $1 - 2I$. `local_terms()` gives, for $H$ and for
+the gap, the exact value, the leading term and the bound, and a logical
+column, `holds`, that is `TRUE` when the leading term is the larger. We look first
+at the bimodal profile.
+
+```{r local-bimodal}
+local_terms(by_shape$bimodal$reliability)
+```
+
+```{r local-bimodal-facts, include = FALSE}
+lb <- local_terms(by_shape$bimodal$reliability)
+mb <- logit_moments(by_shape$bimodal$reliability)
+stopifnot(all(lb$holds), lb$exact[2] > 0,
+          abs(lb$exact[1] - lb$leading[1]) < lb$bound[1])
+```
+
+For this profile the gap's leading term, `r num(lb$leading[2], 3)`, is
+larger than its bound, `r num(lb$bound[2], 3)`, so the gap is positive,
+as $1 - 2I$ is, and its exact value is `r num(lb$exact[2], 3)`. Since $H$
+is never negative, its bound measures instead how close the leading term
+is. Here $H = `r num(lb$exact[1], 3)`$, within `r up(lb$bound[1], 3)` of
+`r num(lb$leading[1], 3)`.
+
+With 8 precise sites the leading terms are the same, because $I$ and $V$
+are, but a few of the centered logits are large, and $\rho_3$ rises from
+`r num(mb[["rho3"]])` to
+`r num(logit_moments(by_shape$concentrated_precise$reliability)[["rho3"]])`.
+
+```{r local-precise}
+local_terms(by_shape$concentrated_precise$reliability)
+```
+
+```{r local-precise-facts, include = FALSE}
+S_p <- by_shape$concentrated_precise$reliability
+lp <- local_terms(S_p)
+ratio <- lp$exact[2] / lp$leading[2]
+rem <- lp$exact[2] - lp$leading[2]
+# The remainder of the gap, site by site, and its part from the 8 precise
+# sites.
+m0 <- qlogis(kl_centroid(S_p))
+d0 <- qlogis(S_p) - m0
+I0 <- plogis(m0)
+r0 <- plogis(m0 + d0) - I0 - I0 * (1 - I0) * d0 -
+  I0 * (1 - I0) * (1 - 2 * I0) * d0^2 / 2
+top8 <- order(S_p, decreasing = TRUE)[1:8]
+lx <- local_terms(S)
+stopifnot(
+  lp$holds[1], !lp$holds[2], lp$exact[2] > 0,
+  all(abs(lp$leading - lb$leading) < 1e-12),
+  ratio > 0.25, ratio < 0.3,
+  abs(mean(r0) - rem) < 1e-12, abs(sum(r0[-top8]) / 40) < 0.05 * abs(rem),
+  !lx$holds[2], lx$bound[2] > 3 * lx$leading[2], lx$exact[2] < 0
+)
+```
+
+Now the gap's bound, `r num(lp$bound[2], 3)`, is larger than its leading
+term, `r num(lp$leading[2], 3)`, and `holds` is `FALSE`, so the leading
+term alone does not fix the sign. The gap is still positive, but at
+`r num(lp$exact[2], 3)` it is only `r pct(ratio)`% of the leading term.
+Its remainder, `r num(rem, 3)`, cancels most of the leading term and comes
+from the 8 precise sites, whose logits lie far above the rest. In the
+profile of 25 sites the bound is `r num(lx$bound[2], 3)`, more than three
+times the leading term, and there the remainder reverses the sign.
+
+Site $j$'s term of $H$,
+$\mathrm{KL}\{\mathrm{Ber}(I) \,\|\, \mathrm{Ber}(S_j)\}$, is the
+divergence of $I$ from that site's reliability. `kl_contributions()`
+returns the terms, and `plot_contributions()` plots them in increasing
+order, here for the profile with 8 precise sites.
+
+```{r contributions, fig.height = 4, fig.alt = "Each site's term of the dispersion H for the profile with 8 precise sites, in increasing order, with H as a dashed line. The 32 other sites have small terms and the 8 precise sites much larger ones."}
+plot_contributions(profiles$concentrated_precise)
+```
+
+```{r contribution-facts, include = FALSE}
+kc <- kl_contributions(S_p)
+share_top <- sum(kc[top8]) / sum(kc)
+stopifnot(length(unique(signif(kc, 8))) == 2L, all(kc[top8] == max(kc)),
+          share_top > 0.8, share_top < 0.85)
+```
+
+Each of the 8 precise sites has a term of `r num(max(kc), 3)`, against
+`r num(min(kc), 3)` for each of the other 32, so these 8 sites account
+for `r pct(share_top)`% of $H$.
+
+## Changing the between-site standard deviation
+
+The sampling variances fix the centered logits,
+$\Delta_j = \log \mathrm{GM}(v) - \log v_j$, and $\sigma_\tau$ moves all
+the logits together. As $\sigma_\tau$ grows from 0, $I$ grows from 0 to
+1, and along this path the derivative of $H$ with respect to the logit of
+$I$ is the gap $\bar S - I$ [@lee2026, Proposition 2]. So $H$ rises from 0
+while the mean reliability is above $I$, reaches its largest value where
+the gap is 0, and falls back to 0. To see how far the summaries move, we
+compute the profile with 8 precise sites at four values of $\sigma_\tau$
+with `update()`.
+
+```{r along}
+precise <- profiles$concentrated_precise
+sigmas <- c(0.15, 0.2, 0.25, 0.3)
+along <- sapply(sigmas, function(s) {
+  update(precise, sigma_tau = s)$stats[c("I", "mean", "gap", "H", "J_eff")]
+})
+round(cbind(sigma_tau = sigmas, t(along)), 3)
+```
+
+```{r along-facts, include = FALSE}
+al <- as.data.frame(t(along))
+stopifnot(diff(range(al$H)) < 0.025, al$gap[1] > 0, al$gap[4] < 0,
+          all(diff(al$J_eff) > 0), al$I[3] < 0.5, al$mean[3] < al$I[3])
+```
+
+Over this range $H$ stays between `r num(min(al$H), 3)` and
+`r num(max(al$H), 3)`, while the gap changes sign, from
+`r num(al$gap[1], 3)` to `r num(al$gap[4], 3)`, and the concentration
+count rises from `r num(al$J_eff[1], 1)` to `r num(al$J_eff[4], 1)`. At
+$\sigma_\tau = 0.25$ the mean reliability, `r num(al$mean[3], 3)`, is
+below $I = `r num(al$I[3], 3)`$ although $I < 1/2$, as in the profile of
+25 sites.
+
+`profile_path()` follows the whole path with the centered logits held
+fixed, and for a profile it also gives $\sigma_\tau$ at each point. On a
+fine grid we find where $H$ is largest.
+
+```{r peak}
+path <- profile_path(precise, n = 2001)
+path[which.max(path$H), c("sigma_tau", "I", "H", "gap")]
+```
+
+```{r peak-facts, include = FALSE}
+top <- path[which.max(path$H), ]
+gm_precise <- exp(mean(log(precise$se2)))
+gap_at_I <- function(I) {
+  update(precise, sigma_tau = sqrt(gm_precise * I / (1 - I)))$stats[["gap"]]
+}
+peak_I <- uniroot(gap_at_I, c(0.3, 0.5), tol = 1e-13)$root
+between <- seq(peak_I + 1e-6, 0.5 - 1e-6, length.out = 101)
+stopifnot(all(vapply(between, gap_at_I, 0) < 0), abs(top$I - peak_I) < 5e-4)
+stopifnot(top$I > 0.3, top$I < 0.5, abs(top$gap) < 1e-3,
+          sum(diff(sign(path$gap)) != 0) == 1, path$gap[nrow(path)] < 0)
+```
+
+At the peak, $H = `r num(top$H, 3)`$,
+$\sigma_\tau \approx `r num(top$sigma_tau)`$ and
+$I \approx `r num(top$I)`$, and the gap is 0 up to the spacing of the
+grid. So the peak is not at $I = 1/2$, where the gap's leading term
+changes sign. `plot_gap_path()` plots $H$ and the gap along the path, with
+their leading terms.
+
+```{r path, fig.height = 5, fig.alt = "Two panels along the informativeness from 0 to 1 for the profile with 8 precise sites. The dispersion H peaks before I = 1/2, at the point where the gap between the mean reliability and I crosses 0. The dashed leading terms peak and cross 0 at I = 1/2."}
+plot_gap_path(precise)
+```
+
+In the left panel $H$ rises steeply from 0, peaks at the cross and returns
+to 0 at $I = 1$, while its leading term (dashed) peaks at $I = 1/2$. In the
+right panel the gap crosses 0 at the same $I$, about `r num(top$I)`, and
+stays negative up to $I = 1$. For every $I$ strictly between this peak
+and 1/2, this profile has $\bar S < I$, against the sign of its leading term.
+The point on each curve is the profile at $\sigma_\tau = 0.2$, before the
+peak. A much larger $\sigma_\tau$ would bring all the reliabilities close
+to 1, where $H$ and the gap return to 0. Along every path with unequal
+sampling variances the gap changes sign once, because $H$ is strictly
+concave in $I$ when the centered logits are fixed. With equal sampling
+variances both $H$ and the gap are 0 throughout. `vignette("implementation")` gives the
+argument.
+
+## The concentration count
+
+With the proportions $q_j = S_j / \sum_k S_k$ of the total reliability,
+the concentration count is the inverse of the sum of their squares,
+
+$$
+J_{\mathrm{eff}} = \frac{(\sum_j S_j)^2}{\sum_j S_j^2}
+= \frac{1}{\sum_j q_j^2}.
+$$
+
+Its largest value, $J$, belongs to profiles of equally reliable sites,
+and it approaches 1, without reaching it, as one site's proportion
+approaches 1. It depends only on the proportions. A trial whose
+40 sites all have reliability 0.05 and one whose 40 sites all have 0.95
+both have $J_{\mathrm{eff}} = `r num(concentration_count(rep(0.05, 40)), 0)`$.
+
+```{r count-facts, include = FALSE}
+stopifnot(abs(concentration_count(rep(0.05, 40)) - 40) < 1e-9,
+          abs(concentration_count(rep(0.95, 40)) - 40) < 1e-9)
+```
+
+We plot the cumulative proportions of the two concentrated profiles, the
+most reliable sites first, with `plot()` and `type = "concentration"`, a
+call to `plot_concentration()`. Because the 8 precise sites are tied, we
+leave out the labels that would name the most reliable sites.
+
+```{r concentration, fig.height = 4.5, fig.alt = "The cumulative proportion of the total reliability against the fraction of sites, most reliable first, for the profiles with 8 precise and with 8 noisy sites, with the diagonal of equal proportions. The first curve climbs steeply over the first fifth of the sites; the second climbs a little faster than the diagonal and flattens after four fifths of the sites."}
+plot(two, type = "concentration", label_top = 0)
+```
+
+```{r concentration-facts, include = FALSE}
+q_top8 <- sum(sort(Sp, decreasing = TRUE)[1:8]) / sum(Sp)
+q_top32 <- sum(sort(Sn, decreasing = TRUE)[1:32]) / sum(Sn)
+stopifnot(q_top8 > 0.5, q_top8 < 0.55, q_top32 > 0.975, q_top32 < 0.985,
+          max(Sn) / sum(Sn) > 1 / 40, max(Sn) / sum(Sn) < 1.3 / 40)
+```
+
+With 8 precise sites the curve climbs steeply over the first fifth of the
+sites, which carry `r pct(q_top8)`% of the total reliability, and then
+rises slowly. With 8 noisy sites it climbs evenly, a little faster than
+the diagonal, until the 32 precise sites have contributed
+`r pct(q_top32)`% of the total, and the 8 noisy ones add the rest. The
+concentration counts printed in the panel,
+`r num(val("concentrated_precise", "J_eff"), 1)` and
+`r num(val("concentrated_noisy", "J_eff"), 1)`, summarize the two curves.
+To see which sites carry the reliability in your own analysis, you can
+give a posterior fit to `plot_concentration()` and `plot_contributions()`
+as well.
+
+## The geometry in two plots
+
+Each site's term of $H$ is a Bregman divergence. With
+$\phi(p) = p \log p + (1 - p)\log(1 - p)$, the term
+$\mathrm{KL}\{\mathrm{Ber}(I) \,\|\, \mathrm{Ber}(S_j)\}$ is the height of
+$\phi$ at $I$ above the tangent to $\phi$ at $S_j$. `plot_geometry()` shows
+the curve, the tangents at a few sites and these heights. We use the even
+profile, whose 40 reliabilities all differ, and four of its sites spread
+over the range.
+
+```{r geometry, fig.height = 4.5, fig.alt = "Panel (a): the curve p log p + (1 - p) log(1 - p) with the tangents at four sites of the even profile and, at p = I, the vertical gap between the curve and each tangent. Panel (b): the four gaps as bars."}
+even <- profiles$even
+plot_geometry(even, sites = c(1, 14, 27, 40))
+```
+
+```{r geometry-facts, include = FALSE}
+drawn <- c(1, 14, 27, 40)
+ke <- kl_contributions(even$S)[drawn]
+de <- qlogis(even$S) - qlogis(kl_centroid(even$S))
+stopifnot(identical(order(even$S[drawn], decreasing = TRUE), 1:4),
+          identical(order(ke, decreasing = TRUE)[1:2], c(1L, 4L)),
+          abs(de[1] + de[40]) < 1e-12, even$S[1] > 0.3, even$S[40] < 0.3,
+          all(abs(de[c(14, 27)]) < abs(de[1])))
+```
+
+In panel (a) the longest gap belongs to the most reliable of the four
+sites, at `r num(even$S[1])`, and the next longest to the least reliable,
+at `r num(even$S[40])`. These two sites are equally far from $I$ on the
+logit scale, but the divergence is not symmetric, and the site above $I$
+has the larger term. Between them, the sites at `r num(even$S[14])` and
+`r num(even$S[27])` are closer to $I$ and have short gaps. Panel (b) gives
+the four terms as bars, `r num(ke[1], 3)`, `r num(ke[2], 3)`,
+`r num(ke[3], 3)` and `r num(ke[4], 3)`. Their mean is not $H$, the
+average over all 40 sites.
+
+Theorem 2 of @lee2026 splits the average divergence of a constant
+reliability $p$ from the profile into two parts,
+
+$$
+\frac{1}{J}\sum_{j=1}^J \mathrm{KL}\{\mathrm{Ber}(p) \,\|\, \mathrm{Ber}(S_j)\}
+= \mathrm{KL}\{\mathrm{Ber}(p) \,\|\, \mathrm{Ber}(I)\} + H,
+$$
+
+so the average is smallest at $p = I$, where it equals $H$.
+`plot_decomposition()` plots the left side against $p$ and shows the split
+at one value of $p$, here 0.75.
+
+```{r decomposition, fig.height = 4.5, fig.alt = "The average divergence of a constant reliability p from the even profile against p, with its minimum H at p = I, the mean reliability marked just to its right, and the split at p = 0.75 into the divergence of p from I plus H."}
+plot_decomposition(even, at = 0.75)
+```
+
+```{r decomposition-facts, include = FALSE}
+kl <- function(p, q) p * log(p / q) + (1 - p) * log((1 - p) / (1 - q))
+I_e <- kl_centroid(even$S)
+H_e <- kl_dispersion(even$S)
+at_avg <- mean(kl(0.75, even$S))
+at_kl <- kl(0.75, I_e)
+sbar_avg <- mean(kl(mean(even$S), even$S))
+stopifnot(abs(at_avg - at_kl - H_e) < 1e-12, mean(even$S) > I_e,
+          sbar_avg > H_e, sbar_avg - H_e < 0.01)
+```
+
+The curve's minimum, at $I = 0.3$, is $H = `r num(H_e, 3)`$, the height
+of the dashed line. At $p = 0.75$ the average divergence is
+`r num(at_avg, 3)`, of which `r num(at_kl, 3)` is the divergence of 0.75
+from $I$ and the rest is $H$. The mean reliability, `r num(mean(even$S), 3)`,
+sits just to the right of the minimum and a little above it on the curve.
+It minimizes the average with $p$ in the second argument, a different
+function of $p$.
+
+## Making profiles of your own
+
+You can build profiles like these with `shape_profile()`, for a
+simulation or to see what the diagnostics of a planned trial might look
+like. It returns sampling variances with a given number of sites,
+informativeness, logit variance and shape at a given $\sigma_\tau$. Here we
+ask for 20 sites in two groups, with $I = 1/2$ and $V = 1$.
+
+```{r shape}
+v <- shape_profile(J = 20, I = 0.5, V = 1, shape = "bimodal",
+                   sigma_tau = 0.25)
+half <- reliability_profile(se2 = v, sigma_tau = 0.25)
+half
+```
+
+```{r shape-facts, include = FALSE}
+hs <- half$stats
+lh <- local_terms(half$S)
+stopifnot(abs(hs[["I"]] - 0.5) < 1e-12, abs(hs[["mean"]] - 0.5) < 1e-12,
+          length(unique(signif(half$S, 8))) == 2L,
+          abs(sum(qlogis(half$S))) < 1e-9,
+          hs[["H"]] > 0, abs(hs[["H"]] - lh$leading[1]) < 0.01)
+```
+
+Its reliabilities take two values, `r num(min(half$S))` and
+`r num(max(half$S))`, whose logits lie symmetrically around
+$\mathrm{logit}\, I = 0$. At $I = 1/2$ the gap's leading term is 0, and
+for this symmetric profile the mean reliability equals $I$. Yet
+$H = `r num(hs[["H"]], 3)`$, close to its leading term
+$\tfrac12 I(1 - I)V = `r num(lh$leading[1], 3)`$, so two equal centroids
+do not make the reliabilities equal.
+
+`vignette("planning")` starts instead from the site sizes, and
+`vignette("posterior-summaries")` returns to an estimated $\sigma_\tau$.
+
+## References

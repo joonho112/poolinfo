@@ -1,0 +1,398 @@
+---
+title: "Study reliabilities in a meta-analysis"
+description: "The reliabilities of the studies of a random-effects meta-analysis fitted with metafor: the informativeness beside metafor's I^2, confidence intervals mapped through the diagnostics, the posterior and the restricted likelihood, a proper prior, and a moderator."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Study reliabilities in a meta-analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+has_metafor <- requireNamespace("metafor", quietly = TRUE)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = has_metafor)
+if (requireNamespace("ragg", quietly = TRUE)) {
+  knitr::opts_chunk$set(dev = "ragg_png")
+}
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+# Bounds in the text are rounded outward, so that they stay true.
+up <- function(x, digits = 2) num(ceiling(x * 10^digits - 1e-9) / 10^digits, digits)
+down <- function(x, digits = 2) num(floor(x * 10^digits + 1e-9) / 10^digits, digits)
+pct <- function(x) round(100 * x)
+```
+
+In a random-effects meta-analysis the studies play the part of the sites.
+A study's reliability is the weight that its own estimate keeps in the
+empirical Bayes prediction of its true effect, and poolinfo's diagnostics
+summarize these weights over the studies. In this vignette we fit a
+meta-analysis with metafor [@viechtbauer2010] and compute the diagnostics
+in three ways: at metafor's estimate of the between-study variance, over a
+confidence interval for it, and over its posterior. Along the way we
+relate them to the heterogeneity statistics that metafor prints. For the
+definitions of $I$, $\bar S$, $H$, $V$ and $J_{\mathrm{eff}}$ (the
+informativeness, the mean reliability, the dispersion, the logit variance
+and the concentration count), see `vignette("poolinfo")`.
+
+`r if (!has_metafor) "The rest of this vignette needs the metafor package, which is not installed."`
+
+```{r library, message = FALSE}
+library(poolinfo)
+library(metafor)
+```
+
+```{r without-metafor, include = FALSE, eval = TRUE}
+if (!has_metafor) knitr::knit_exit()
+```
+
+metafor writes the between-study variance $\tau^2$, and poolinfo writes it
+$\sigma_\tau^2$ (`sigma_tau^2` in its printed output). We use poolinfo's
+notation from here on, so $\sigma_\tau$ is the between-study standard
+deviation. poolinfo's printed output calls the studies sites.
+
+## A meta-analysis of teacher expectancy effects
+
+We use the data set `dat.raudenbush1985` of the metadat package, which
+metafor loads. It has `r nrow(dat.raudenbush1985)` studies of the effect
+of teachers' expectations on their pupils' IQ, each with a standardized
+mean difference and its sampling variance
+[@raudenbush1984; @raudenbush1985]. We fit the usual random-effects model
+by restricted maximum likelihood (REML).
+
+```{r fit}
+dat <- dat.raudenbush1985
+fit <- rma(yi, vi, data = dat, method = "REML")
+fit
+```
+
+```{r fit-facts, include = FALSE}
+s2 <- typical_variance(se2 = dat$vi)
+gm <- exp(mean(log(dat$vi)))
+I2_Q <- (fit$QE - (fit$k - 1)) / fit$QE
+fit_dl <- rma(yi, vi, data = dat, method = "DL")
+stopifnot(
+  abs(fit$I2 / 100 - fit$tau2 / (fit$tau2 + s2)) < 1e-10,
+  abs(fit_dl$I2 / 100 - I2_Q) < 1e-10,
+  abs(I2_Q - fit$I2 / 100) > 0.05,
+  abs(fit$H2 - 1 / (1 - fit$I2 / 100)) < 1e-10,
+  s2 < gm
+)
+# The typical variance can be below or above the geometric mean.
+gm_of <- function(v) exp(mean(log(v)))
+stopifnot(typical_variance(se2 = c(1, 1, 100)) < gm_of(c(1, 1, 100)),
+          typical_variance(se2 = c(1, 100, 100)) > gm_of(c(1, 100, 100)))
+```
+
+metafor estimates $\sigma_\tau^2$ at `r num(fit$tau2, 4)` and reports
+$I^2 = `r num(fit$I2, 1)`\%$ and $H^2 = `r num(fit$H2)`$. As a proportion,
+its $I^2$ is $\hat\sigma_\tau^2 / (\hat\sigma_\tau^2 + v_{\mathrm{typ}})$,
+where $v_{\mathrm{typ}}$, `r num(s2, 4)` here, is the "typical"
+within-study variance of
+@higgins2002, which `typical_variance()` also computes. The familiar
+$(Q - \mathrm{df})/Q$, here `r num(I2_Q)`, agrees with it only when
+$\sigma_\tau^2$ is estimated by the DerSimonian-Laird method
+[@dersimonian1986], as the note
+in `?metafor::print.rma` explains. metafor's $H^2$ is $1/(1 - I^2)$, the
+ratio of the total variability to the sampling variability, and it has
+nothing to do with poolinfo's dispersion $H$.
+
+## The profile at the REML estimate
+
+`reliability_profile()` takes the fit, computes the studies' reliabilities
+at metafor's estimate of $\sigma_\tau$, and summarizes them.
+
+```{r profile}
+profile <- reliability_profile(fit)
+profile
+```
+
+```{r profile-facts, include = FALSE}
+mu <- c(coef(fit))
+stopifnot(
+  max(abs(blup(fit)$pred - (mu + profile$S * (dat$yi - mu)))) < 1e-10,
+  profile$stats[["I"]] < fit$I2 / 100,
+  fit$se.tau2 > 0.75 * fit$tau2
+)
+```
+
+At the REML estimate, $I$ is `r num(profile$stats[["I"]])`, below
+metafor's $I^2$ of `r num(fit$I2 / 100)`, although both divide
+$\sigma_\tau^2$ by $\sigma_\tau^2$ plus a representative sampling
+variance. $I$ uses the geometric mean of the sampling variances,
+`r num(gm, 4)`, which here is larger than the typical variance (with other
+variances it can be smaller). So $I$ is the reliability of a study whose
+sampling variance is that geometric mean, and also what we get by
+averaging the studies' reliabilities on the logit scale and transforming
+back [@lee2026]. Across the studies, the reliabilities range from
+`r num(min(profile$S))` to `r num(max(profile$S))`. Each is the weight
+that a study's own estimate keeps in its empirical Bayes prediction:
+`blup(fit)` returns $\hat\mu + S_j (y_j - \hat\mu)$ for study $j$, with
+$\hat\mu$ the estimated mean effect.
+
+A profile at one value of $\sigma_\tau$ carries no uncertainty about that
+value, and with `r fit$k` studies the uncertainty is large. metafor's
+standard error of $\hat\sigma_\tau^2$, `r num(fit$se.tau2, 4)`, is
+`r pct(fit$se.tau2 / fit$tau2)`% of the estimate itself.
+
+## Confidence intervals mapped through the diagnostics
+
+$I$ and $\bar S$ increase with $\sigma_\tau^2$, and so does $J_{\mathrm{eff}}$
+when the sampling variances differ, as they do here. A confidence interval
+for $\sigma_\tau^2$ therefore maps to an interval for each of them with the
+same coverage. $H$ first rises and then falls, so its interval is the range
+of $H$ over the interval for $\sigma_\tau^2$, which covers the true value at
+least as often. `map_tau2_interval()` maps the Q-profile interval of
+@viechtbauer2007, which `confint()` also reports for this fit up to its
+default tolerance, and keeps it as an attribute.
+
+```{r mapped}
+mapped <- map_tau2_interval(fit)
+mapped
+attr(mapped, "interval")
+```
+
+metafor's `confint()` maps the same Q-profile interval through its own
+$I^2$:
+
+```{r confint}
+confint(fit)
+```
+
+```{r mapped-facts, include = FALSE}
+at_I <- function(m, col) m[[col]][m$functional == "I"]
+qp <- attr(mapped, "interval")
+ci <- confint(fit, control = list(tol = 1e-12, maxiter = 1000))$random
+stopifnot(
+  abs(qp[["lower"]] - ci["tau^2", "ci.lb"]) < 1e-8,
+  abs(qp[["upper"]] - ci["tau^2", "ci.ub"]) < 1e-6,
+  qp[["lower"]] > 0,
+  at_I(mapped, "lower") < profile$stats[["I"]],
+  at_I(mapped, "upper") > 0.8
+)
+```
+
+The Q-profile interval for $\sigma_\tau^2$ runs from
+`r num(qp[["lower"]], 4)` to `r num(qp[["upper"]], 4)`. Through $I$ it
+becomes a 95% confidence interval from `r num(at_I(mapped, "lower"))` to
+`r num(at_I(mapped, "upper"))`, and through metafor's $I^2$ an interval
+from `r pct(ci["I^2(%)", "ci.lb"] / 100)`% to
+`r pct(ci["I^2(%)", "ci.ub"] / 100)`%. Both intervals have the coverage of
+the Q-profile interval and differ only in the representative sampling
+variance. Like everything else in poolinfo, they are conditional on the
+sampling variances.
+
+## The posterior and the restricted likelihood
+
+`reliability_posterior()` takes the fit too. It computes the posterior of
+the diagnostics with flat priors on the mean and on $\sigma_\tau$, the
+package's default, which `vignette("posterior-summaries")` discusses.
+
+```{r posterior}
+post <- reliability_posterior(fit)
+post
+```
+
+```{r posterior-facts, include = FALSE}
+pp <- profile_summary(post)
+val <- function(q, col = "mean") pp[[col]][pp$quantity == q]
+# Under the flat priors, the posterior density of sigma_tau is proportional
+# to the restricted likelihood, whose peak is at the REML estimate.
+ll <- function(tau2) {
+  c(logLik(rma(yi, vi, data = dat, method = "REML", tau2 = tau2)))
+}
+ratio_0 <- exp(ll(0) - ll(fit$tau2))
+dens <- functional_density(post, "sigma_tau", n = 4000)
+peak <- dens$value[which.max(dens$density)]
+at <- c(0.05, 0.1, 0.2, 0.3)
+from_density <- approx(dens$value, dens$density, xout = at)$y /
+  max(dens$density)
+from_likelihood <- exp(sapply(at^2, ll) - ll(fit$tau2))
+stopifnot(
+  val("I", "lower") < 0.01, prob_above(post) < 0.5,
+  abs(peak - sqrt(fit$tau2)) < 0.002,
+  max(abs(from_density - from_likelihood)) < 0.005,
+  ratio_0 > 0.5, fit$QEp < 0.025
+)
+```
+
+With a posterior mean of `r num(val("I"))` and a 95% posterior interval
+from `r num(val("I", "lower"), 3)` to `r num(val("I", "upper"))`, the
+posterior of $I$ reaches values near 0, although the Q-profile interval for
+$\sigma_\tau^2$ excludes 0. Each interval rests on a different statistic. With a flat prior on the mean,
+integrating the mean out of the likelihood leaves the restricted
+likelihood that REML maximizes [@harville1974]. Since the prior on $\sigma_\tau$ is flat
+too, the posterior density of $\sigma_\tau$ is proportional to that
+restricted likelihood. Its peak is at the REML estimate,
+$\hat\sigma_\tau = `r num(sqrt(fit$tau2), 3)`$, and at $\sigma_\tau = 0$
+the density is still `r num(ratio_0)` of the peak. Cochran's $Q$, on which
+the Q-profile interval is built, is `r num(fit$QE, 1)` at
+$\sigma_\tau^2 = 0$, on `r fit$k - 1` degrees of freedom
+($p = `r num(fit$QEp, 3)`$).
+
+A confidence interval built on the restricted likelihood behaves like the
+posterior. metafor's profile likelihood interval, which
+`?metafor::confint.rma` describes as more consistent with REML estimation,
+includes 0, and we map it through the diagnostics by giving
+`map_tau2_interval()` the sampling variances and the interval.
+
+```{r profile-likelihood}
+pl <- confint(fit, type = "PL")$random["tau^2", ]
+mapped_pl <- map_tau2_interval(se2 = dat$vi, interval = c(
+  estimate = fit$tau2, lower = pl[["ci.lb"]], upper = pl[["ci.ub"]]
+))
+mapped_pl
+```
+
+```{r profile-likelihood-facts, include = FALSE}
+stopifnot(pl[["ci.lb"]] == 0, at_I(mapped_pl, "lower") == 0,
+          abs(at_I(mapped_pl, "upper") - val("I", "upper")) < 0.05,
+          at_I(mapped_pl, "upper") < at_I(mapped, "upper"))
+```
+
+Mapped through $I$, the profile likelihood interval runs from
+`r num(at_I(mapped_pl, "lower"))` to `r num(at_I(mapped_pl, "upper"))`,
+close to the posterior interval from `r num(val("I", "lower"), 3)` to
+`r num(val("I", "upper"))`, whereas the Q-profile interval gave
+`r num(at_I(mapped, "lower"))` to `r num(at_I(mapped, "upper"))`.
+
+## A proper prior
+
+With `r fit$k` studies we also want to know how much the flat prior on
+$\sigma_\tau$ contributes. A half-normal prior with scale 0.5 is a
+reasonable proper alternative for standardized mean differences. It puts
+95% of its mass below `r num(0.5 * qnorm(0.975))`, so it allows true
+effects that vary from study to study by up to about one standard
+deviation of IQ and makes larger spreads unlikely. `prior_sensitivity()`
+refits the posterior under it and sets the two fits side by side.
+
+```{r prior}
+prior_sensitivity(post, list(
+  `half-normal, scale 0.5` = sd_prior("half_normal", scale = 0.5)
+))
+```
+
+```{r prior-facts, include = FALSE}
+half_normal <- update(post, prior = sd_prior("half_normal", scale = 0.5))
+ph <- profile_summary(half_normal)
+hn <- function(q, col = "mean") ph[[col]][ph$quantity == q]
+stopifnot(abs(hn("I") - val("I")) < 0.02,
+          abs(hn("I", "upper") - val("I", "upper")) < 0.02)
+```
+
+With this prior, $I$ has a posterior mean of `r num(hn("I"), 3)` rather
+than `r num(val("I"), 3)`, and its 95% posterior interval ends at
+`r num(hn("I", "upper"), 3)` rather than `r num(val("I", "upper"), 3)`.
+For these studies, then, our reading of the posterior is the same under
+either prior.
+
+## A moderator
+
+With moderators, $\sigma_\tau^2$ is the residual heterogeneity, the
+variance of the true effects around the meta-regression, and each study is
+pulled toward its own predicted value. @raudenbush1984 related the effects
+to the weeks of contact between teachers and pupils before the
+expectations were induced. As in the example on the help page of
+`dat.raudenbush1985`, we cap the weeks at 3, so that the moderator
+distinguishes 0, 1, 2, and 3 or more weeks.
+
+```{r moderator}
+dat$weeks.c <- pmin(dat$weeks, 3)
+fit_weeks <- rma(yi, vi, mods = ~ weeks.c, data = dat, method = "REML")
+fit_weeks
+```
+
+```{r moderator-facts, include = FALSE}
+S_weeks <- reliability_profile(fit_weeks)$S
+stopifnot(fit_weeks$tau2 < 1e-4, fit_weeks$R2 > 99, fit_weeks$QEp > 0.4,
+          max(S_weeks) < 1e-3)
+```
+
+The REML estimate of the residual $\sigma_\tau^2$ falls from
+`r num(fit$tau2, 4)` to `r num(fit_weeks$tau2, 4)`, metafor's $R^2$ is
+`r round(fit_weeks$R2)`%, and the test for residual heterogeneity gives
+$p = `r num(fit_weeks$QEp)`$. At that estimate the largest study
+reliability is `r formatC(max(S_weeks), format = "f", digits = 5)`, so
+the profile at the REML estimate would pull every study all the way to its
+predicted value. Under the flat priors, the posterior instead weights each
+value of $\sigma_\tau$ by its restricted likelihood, as we saw above, and
+we fit it for the meta-regression next.
+
+```{r moderator-posterior}
+post_weeks <- reliability_posterior(fit_weeks)
+post_weeks
+```
+
+```{r moderator-posterior-facts, include = FALSE}
+pw <- profile_summary(post_weeks)
+wk <- function(q, col = "mean") pw[[col]][pw$quantity == q]
+stopifnot(wk("I") < val("I") / 2, wk("I", "upper") < 0.5,
+          wk("sigma_tau") < val("sigma_tau") / 2,
+          all(post_weeks$checks$status == "ok"))
+```
+
+With the moderator, the posterior mean of $I$ falls from
+`r num(val("I"))` to `r num(wk("I"))`, with a 95% posterior interval from
+`r num(wk("I", "lower"))` to `r num(wk("I", "upper"))`, and the posterior
+mean of $\sigma_\tau$ from `r num(val("sigma_tau"), 3)` to
+`r num(wk("sigma_tau"), 3)`. Once the moderator accounts for most of the
+variation of the true effects, little of what remains can be told apart
+from sampling error. The model then pulls each study most of the way
+toward its predicted value. Now the flat prior is on the two coefficients
+of the meta-regression, and the printed output lists their posterior means
+and intervals.
+
+## The studies' reliabilities
+
+Here the sampling variances range from `r num(min(dat$vi), 4)` to
+`r num(max(dat$vi), 4)`, a `r round(max(dat$vi) / min(dat$vi))`-fold
+range, and their logit variance is $V = `r num(val("V"))`$. We plot the
+reliabilities of the model without the moderator, sorted, with their 95%
+posterior intervals.
+
+```{r plot-profile, fig.alt = sprintf("The posterior means of the %d study reliabilities, sorted from %s to %s, with their 95%% posterior intervals, the informativeness and its 95%% posterior band, and the mean reliability.", fit$k, num(min(site_table(post)$reliability)), num(max(site_table(post)$reliability)))}
+plot_profile(post)
+```
+
+```{r plot-profile-facts, include = FALSE}
+sites <- site_table(post)
+low <- sites$site[sites$reliability == min(sites$reliability)]
+high <- sites$site[sites$reliability == max(sites$reliability)]
+stopifnot(identical(low, "4"), identical(high, "18"),
+          which.max(dat$vi) == 4L, which.min(dat$vi) == 18L,
+          all(sites$reliability_lower < 0.02),
+          all(sites$reliability_upper - sites$reliability_lower > 0.45))
+```
+
+Study `r low`, by `r dat$author[as.integer(low)]`, has the largest
+sampling variance and a posterior mean reliability of
+`r num(min(sites$reliability))`, and study `r high`, by
+`r dat$author[as.integer(high)]`, has the smallest variance and
+`r num(max(sites$reliability))`. Every study's posterior interval starts
+below `r up(max(sites$reliability_lower))` and is at least
+`r down(min(sites$reliability_upper - sites$reliability_lower))` long,
+because the posterior of $\sigma_\tau$ is wide, and the band of $I$ runs
+from `r num(val("I", "lower"), 3)` to `r num(val("I", "upper"))`.
+
+## Your own meta-analysis
+
+With your own meta-analysis, you pass the `rma()` fit to
+
+- `reliability_profile()` for the profile at its estimate,
+- `map_tau2_interval()` for confidence intervals, or
+- `reliability_posterior()` for the posterior, where its moderators
+  become the mean model.
+
+poolinfo reads fits of `rma.uni()`, the function behind `rma()`, which
+have one between-study variance and independent estimates. If your studies
+give several estimates each, you would model them with `rma.mv()`, whose
+fits poolinfo does not read. One option is then to combine the estimates
+of each study into one with metafor's `aggregate()` method for `escalc()`
+data, under an assumed correlation within studies, and to fit `rma()` to
+the result.
+
+## References

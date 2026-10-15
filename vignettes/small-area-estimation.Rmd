@@ -1,0 +1,284 @@
+---
+title: "Small area estimation with a Fay-Herriot model"
+description: "The reliability profile of an area-level Fay-Herriot model: direct estimates of many areas with design-based variances, a covariate in the mean, how the total reliability is spread over the areas, and the EBLUP."
+output:
+  rmarkdown::html_vignette:
+    fig_width: 7
+    fig_height: 4.5
+bibliography: references.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Small area estimation with a Fay-Herriot model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+if (requireNamespace("ragg", quietly = TRUE)) {
+  knitr::opts_chunk$set(dev = "ragg_png")
+}
+options(poolinfo.use_cli = FALSE, width = 80)
+num <- function(x, digits = 2) formatC(x, format = "f", digits = digits)
+# Bounds in the text are rounded outward, so that they stay true.
+up <- function(x, digits = 2) num(ceiling(x * 10^digits - 1e-9) / 10^digits, digits)
+down <- function(x, digits = 2) num(floor(x * 10^digits + 1e-9) / 10^digits, digits)
+pct <- function(x) round(100 * x)
+has_metafor <- requireNamespace("metafor", quietly = TRUE)
+```
+
+Small area estimation often starts from a survey that gives a direct
+estimate for each area, such as a district or a county, with a variance
+computed from the survey design. In the area-level model of @fay1979,
+the direct estimates play the part of a multisite trial's site estimates.
+Each direct estimate is normal around the area's true value, with its
+sampling variance $v_j$, and the true values are normal around a
+regression on area covariates, with variance $\sigma_\tau^2$. Under this
+model, the best linear unbiased predictor (BLUP) of an area's true value
+pulls the direct estimate toward the regression prediction and keeps the
+weight
+
+$$
+S_j = \frac{\sigma_\tau^2}{\sigma_\tau^2 + v_j}
+$$
+
+on the area's own estimate. These weights are poolinfo's site
+reliabilities. In this vignette we compute their diagnostics for a set of
+simulated areas under two mean models, and we set the posterior means
+beside the empirical BLUP (EBLUP). We report the informativeness $I$, the
+mean reliability $\bar S$, the dispersion $H$, the logit variance $V$ and
+the concentration count $J_{\mathrm{eff}}$ of each fit, as
+`vignette("poolinfo")` defines them.
+
+In the small area literature the same quantities go by other letters.
+Much of the Fay-Herriot literature writes $A$ for $\sigma_\tau^2$ and
+$D_j$ for $v_j$, and @rao2015 write
+
+- $\sigma_v^2$ for $\sigma_\tau^2$, the variance of the true values around
+  the regression;
+- $\psi_j$ for $v_j$, the sampling variance of area $j$'s direct estimate;
+- $\gamma_j$ for $S_j$, the weight on the area's direct estimate.
+
+```{r library}
+library(poolinfo)
+```
+
+## Simulated areas
+
+We simulate areas whose survey samples differ widely in size. Each direct
+estimate is a mean, with a design effect of 1.5 on its variance, and the
+true area means depend on a covariate `x`, such as a standardized measure
+of poverty from administrative records.
+
+```{r simulate}
+set.seed(20261014)
+J <- 150
+n <- pmax(8, round(exp(rnorm(J, log(60), 0.9))))
+x <- rnorm(J)
+truth <- 0.2 + 0.4 * x + rnorm(J, sd = 0.15)
+se <- sqrt(1.5 / n)
+areas <- data.frame(area = sprintf("A%03d", seq_len(J)), n = n, x = x,
+                    estimate = rnorm(J, truth, se), se = se)
+summary(areas$n)
+```
+
+```{r simulate-facts, include = FALSE}
+stopifnot(min(areas$n) >= 8, max(areas$n) > 300)
+```
+
+Across the `r J` areas, samples range from `r min(areas$n)` to
+`r max(areas$n)` respondents, with a median of `r median(areas$n)`. In a
+real application, `estimate` and `se` would be each area's direct estimate
+and its design-based standard error. Like the analysis of a multisite
+trial, the Fay-Herriot model treats the sampling variances as known,
+although they are estimated from the same small samples. In practice the
+direct variances are often smoothed first, for example with a generalized
+variance function, before they enter the model [@rao2015]. Whatever noise
+the variances carry passes into the diagnostics. $V$ is the variance of
+the logarithms of the $v_j$, so independent errors in the estimated
+variances tend to raise it, and they spread the reliabilities further
+apart. Our simulation uses the true variances, which stand in for
+smoothed ones.
+
+## A common mean and a regression mean
+
+We fit the posterior twice, first with a common mean for all the areas
+and then with the covariate in the mean, as in the Fay-Herriot model.
+`mean_model` takes a one-sided formula, and its variables are looked up in
+`data`.
+
+```{r fits}
+common <- reliability_posterior(estimate, se = se, site = area, data = areas)
+regression <- reliability_posterior(estimate, se = se, site = area,
+                                    data = areas, mean_model = ~ x)
+compare_profiles(`common mean` = common, `mean model ~ x` = regression)
+```
+
+```{r fit-facts, include = FALSE}
+pc <- profile_summary(common)
+pr <- profile_summary(regression)
+get <- function(ps, q, col = "mean") ps[[col]][ps$quantity == q]
+stopifnot(get(pc, "I") > 0.85, get(pr, "I") < 0.6,
+          get(pr, "sigma_tau") < get(pc, "sigma_tau") / 2,
+          abs(get(pc, "V") - get(pr, "V")) < 1e-12,
+          get(pr, "H") > 2 * get(pc, "H"),
+          abs(get(pr, "I") - 0.5) < abs(get(pc, "I") - 0.5))
+```
+
+With a common mean, the between-area standard deviation includes
+everything that the covariate explains. Its posterior mean is
+`r num(get(pc, "sigma_tau"), 3)` and $I$ is `r num(get(pc, "I"))`, so the
+model would move an area with the geometric-mean standard error only about
+`r pct(1 - get(pc, "I"))`% of the way toward the common mean. With the
+covariate, $\sigma_\tau$ is the standard deviation of the true values
+around the regression line,
+`r num(get(pr, "sigma_tau"), 3)`, and $I$ falls to `r num(get(pr, "I"))`.
+Because the Fay-Herriot predictor shrinks toward the regression
+prediction, the second profile is the one that describes it. When you
+report the diagnostics of an area-level model, report them for the mean
+model that your predictor uses.
+
+Both fits have the same logit variance, $V = `r num(get(pr, "V"))`$,
+because $V$ depends on the standard errors alone. Their dispersions differ
+(`r num(get(pc, "H"), 3)` with the common mean and
+`r num(get(pr, "H"), 3)` with the covariate), because the leading term of
+$H$, $I(1 - I)V/2$, is largest at $I = 1/2$.
+
+We print the fit with the covariate, which lists the posterior of the
+regression coefficients beside the diagnostics.
+
+```{r regression}
+regression
+```
+
+```{r regression-facts, include = FALSE}
+coef_mean <- function(name) get(pr, paste0("coef_", name))
+stopifnot(all(regression$checks$status == "ok"))
+```
+
+Its intercept and slope have posterior means of
+`r num(coef_mean("(Intercept)"), 3)` and `r num(coef_mean("x"), 3)`. Each
+area counts once in the diagnostics, whether its sample has `r min(areas$n)`
+respondents or `r max(areas$n)`.
+
+## Concentration of the reliability
+
+A direct estimate's variance here is proportional to $1/n$, so the
+`r round(max(areas$n) / min(areas$n))`-fold range of the sample sizes
+carries over to the variances. `plot_concentration()` shows how the total
+reliability $\sum_j S_j$ accumulates over the areas, from the most reliable
+one down.
+
+```{r concentration, fig.alt = "The cumulative proportion of the total reliability against the fraction of areas, most reliable first, for the model with the covariate, with the diagonal of equal proportions."}
+plot_concentration(regression, label_top = 0)
+```
+
+```{r concentration-facts, include = FALSE}
+sites <- site_table(regression)
+q <- sort(sites$share, decreasing = TRUE)
+top_quarter <- sum(q[seq_len(J / 4)])
+precision <- sort(1 / areas$se^2, decreasing = TRUE)
+top_precision <- sum(precision[seq_len(J / 4)]) / sum(precision)
+stopifnot(top_quarter > 0.3, top_quarter < 0.45,
+          top_precision > top_quarter + 0.1, max(sites$reliability) < 0.95)
+```
+
+At a quarter of the areas the curve reaches `r pct(top_quarter)`%, so the
+most reliable quarter carries that proportion of the total reliability,
+although it has `r pct(top_precision)`% of the total precision, the sum of
+the $1/v_j$. A reliability cannot exceed 1, and the most precise areas,
+with reliabilities up to `r num(max(sites$reliability))`, cannot carry
+reliability in proportion to their precision. So the total reliability
+is spread more evenly over the areas than the precision is, and the
+concentration count of `r num(get(pr, "J_eff"), 1)` of `r J` puts that
+spread in one number.
+
+## The areas
+
+We plot each direct estimate beside the posterior mean of its area's true
+value, with the areas ordered by reliability. With this many areas the
+plot has no labels, and we name its horizontal axis after what it shows.
+
+```{r pooling, fig.height = 6, message = FALSE, fig.alt = "The direct estimates of 150 areas with their 95% intervals, beside the posterior means of the area values with their 95% posterior intervals, ordered by reliability from the least reliable area at the bottom."}
+plot_pooling(regression, order = "reliability") +
+  ggplot2::labs(x = "Area mean")
+```
+
+```{r pooling-facts, include = FALSE}
+least <- which.min(sites$reliability)
+most <- which.max(sites$reliability)
+width_ratio <- function(i) {
+  (sites$effect_upper[i] - sites$effect_lower[i]) / (2 * 1.96 * sites$se[i])
+}
+stopifnot(width_ratio(least) < 0.5, width_ratio(most) > 0.85)
+```
+
+The least reliable areas are at the bottom. Their posterior intervals are
+much shorter than the intervals of their direct estimates (for the least
+reliable area, `r pct(width_ratio(least))`% as long), and their posterior
+means lie away from the direct estimates, toward the regression
+predictions. Toward the top the two intervals of an area nearly coincide,
+and for the most reliable area the posterior interval is
+`r pct(width_ratio(most))`% as long as the direct one.
+
+`site_table()` gives the numbers behind the plot. We add each area's
+regression prediction, the intercept plus the slope times `x` at their
+posterior means, and show the three areas with the smallest standard
+errors and the three with the largest.
+
+```{r table}
+coefs <- subset(profile_summary(regression), grepl("^coef_", quantity))$mean
+tab <- site_table(regression)
+tab$prediction <- coefs[1] + coefs[2] * areas$x
+tab <- tab[order(tab$se), c("site", "estimate", "prediction", "se",
+                            "reliability", "effect")]
+print(rbind(head(tab, 3), tail(tab, 3)), digits = 2)
+```
+
+```{r table-facts, include = FALSE}
+moved <- (tab$effect - tab$estimate) / (tab$prediction - tab$estimate)
+stopifnot(tab$reliability[1] > 0.85, tab$reliability[nrow(tab)] < 0.2,
+          all(moved > 0 & moved < 1),
+          max(abs(moved - (1 - tab$reliability))) < 0.05)
+```
+
+Each posterior mean lies between the area's direct estimate and its
+prediction, about $1 - S_j$ of the way from the first to the second. In
+the first three rows, with reliabilities of
+`r down(min(head(tab$reliability, 3)))` and more, the posterior means stay
+near the direct estimates. In the last three, with reliabilities of
+`r up(max(tail(tab$reliability, 3)))` or less, they move most of the way
+to the predictions.
+
+## Posterior means and the EBLUP
+
+The posterior means here come from the normal model with flat priors on
+the coefficients and on $\sigma_\tau$, averaged over the posterior of
+$\sigma_\tau$. In the usual Fay-Herriot predictor, the EBLUP, an estimate
+of $\sigma_\tau^2$ such as the REML estimate goes into the BLUP instead
+[@rao2015]. metafor fits the same model by REML. Next we compute the
+profile at its estimate, and the largest difference between an EBLUP, from
+`metafor::blup()`, and the posterior mean of the same area.
+
+```{r eblup, eval = has_metafor}
+fh <- metafor::rma(estimate, sei = se, mods = ~ x, data = areas,
+                   method = "REML")
+reliability_profile(fh)
+max(abs(metafor::blup(fh)$pred - site_table(regression)$effect))
+```
+
+```{r eblup-facts, include = FALSE, eval = has_metafor}
+I_reml <- reliability_profile(fh)$stats[["I"]]
+gap <- plugin_gap(regression)
+I_at_mean <- gap$at_mean_sigma2[gap$functional == "I"]
+eblup_diff <- max(abs(metafor::blup(fh)$pred - sites$effect))
+I_spread <- diff(range(c(I_reml, I_at_mean, get(pr, "I"))))
+stopifnot(I_spread < 0.01, eblup_diff < 0.01)
+```
+
+`r if (has_metafor) sprintf("At the REML estimate, $\\sigma_\\tau = %s$ and $I = %s$, against a posterior mean of %s for $I$ and a value of %s at the posterior mean of $\\sigma_\\tau^2$. With %d areas the 95%% posterior interval of $\\sigma_\\tau$ runs from %s to %s, so these three values of $I$ lie within %s of one another, and no EBLUP differs from its area's posterior mean by more than %s.", num(sqrt(fh$tau2), 3), num(I_reml, 3), num(get(pr, "I"), 3), num(I_at_mean, 3), J, num(get(pr, "sigma_tau", "lower"), 3), num(get(pr, "sigma_tau", "upper"), 3), up(I_spread, 3), up(eblup_diff, 3))`
+With few areas the posterior mean of $I$, its value at the posterior mean
+of $\sigma_\tau^2$ and its value at the REML estimate can be far apart, as
+`vignette("posterior-summaries")` shows for the eight schools.
+
+## References

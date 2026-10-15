@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 181 209" width="181" height="209">
+  <polygon points="90.5,1.5 179.5,52.25 179.5,156.75 90.5,207.5 1.5,156.75 1.5,52.25" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="9" stroke-linejoin="round"/>
+  <line x1="90.5" y1="40.0" x2="90.5" y2="162.0" stroke="#D55E00" stroke-width="4"/>
+  <line x1="32.5" y1="52.0" x2="58.6" y2="150.0" stroke="#0072B2" stroke-width="7" stroke-linecap="round"/>
+  <line x1="70.5" y1="52.0" x2="78.1" y2="150.0" stroke="#0072B2" stroke-width="7" stroke-linecap="round"/>
+  <line x1="110.5" y1="52.0" x2="102.9" y2="150.0" stroke="#0072B2" stroke-width="7" stroke-linecap="round"/>
+  <line x1="148.5" y1="52.0" x2="122.4" y2="150.0" stroke="#0072B2" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="32.5" cy="52.0" r="9" fill="#FFFFFF" stroke="#7A7A7A" stroke-width="4.5"/>
+  <circle cx="70.5" cy="52.0" r="9" fill="#FFFFFF" stroke="#7A7A7A" stroke-width="4.5"/>
+  <circle cx="110.5" cy="52.0" r="9" fill="#FFFFFF" stroke="#7A7A7A" stroke-width="4.5"/>
+  <circle cx="148.5" cy="52.0" r="9" fill="#FFFFFF" stroke="#7A7A7A" stroke-width="4.5"/>
+  <circle cx="58.6" cy="150.0" r="9.5" fill="#0072B2"/>
+  <circle cx="78.1" cy="150.0" r="9.5" fill="#0072B2"/>
+  <circle cx="102.9" cy="150.0" r="9.5" fill="#0072B2"/>
+  <circle cx="122.4" cy="150.0" r="9.5" fill="#0072B2"/>
+</svg>
