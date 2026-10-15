@@ -132,6 +132,8 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.1'
+      # ebnm needs trust, whose current version needs R 4.2; trust 0.1-8 is
+      # the last version that installs on R 4.1.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: '"hard"'
@@ -144,6 +146,7 @@ jobs:
             any::rmarkdown
             any::metafor
             any::posterior
+            trust@0.1-8
             any::ebnm
             github::joonho112/multisiteDGP@011db7a2a2ffe7a299cff23d54a51f0528694be5
       - uses: r-lib/actions/check-r-package@v2
